@@ -1,76 +1,105 @@
-const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'f1handicap.db'));
+const DB_PATH = path.join(__dirname, 'f1handicap.json');
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+function getInitialData() {
+  return {
+    users: [],
+    drivers: [],
+    user_picks: [],
+    races: [],
+    race_results: [],
+    user_race_scores: [],
+    settings: {
+      picks_locked: '0',
+      max_handicap: '30.0',
+      season_year: '2025',
+    },
+  };
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    is_admin INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+class JsonDB {
+  constructor() {
+    if (fs.existsSync(DB_PATH)) {
+      try {
+        this.data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+      } catch {
+        this.data = getInitialData();
+      }
+    } else {
+      this.data = getInitialData();
+      this._save();
+    }
+  }
 
-  CREATE TABLE IF NOT EXISTS drivers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    number INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    short_name TEXT NOT NULL,
-    team TEXT NOT NULL,
-    team_color TEXT NOT NULL,
-    championship_pts INTEGER DEFAULT 0
-  );
+  _save() {
+    fs.writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2));
+  }
 
-  CREATE TABLE IF NOT EXISTS user_picks (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id),
-    driver1_id INTEGER REFERENCES drivers(id),
-    driver2_id INTEGER REFERENCES drivers(id),
-    swaps_used INTEGER DEFAULT 0,
-    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+  // Settings
+  getSetting(key) { return this.data.settings[key]; }
+  setSetting(key, value) {
+    this.data.settings[key] = String(value);
+    this._save();
+  }
+  allSettings() { return { ...this.data.settings }; }
 
-  CREATE TABLE IF NOT EXISTS races (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    round INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    circuit TEXT NOT NULL,
-    date TEXT NOT NULL,
-    is_completed INTEGER DEFAULT 0
-  );
+  // Table ops
+  all(table) { return this.data[table] || []; }
+  find(table, pred) { return this.all(table).filter(pred); }
+  findOne(table, pred) { return this.all(table).find(pred) || null; }
+  count(table) { return this.all(table).length; }
 
-  CREATE TABLE IF NOT EXISTS race_results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    race_id INTEGER REFERENCES races(id),
-    driver_id INTEGER REFERENCES drivers(id),
-    points REAL DEFAULT 0,
-    UNIQUE(race_id, driver_id)
-  );
+  insert(table, obj) {
+    const arr = this.data[table];
+    const maxId = arr.reduce((m, r) => Math.max(m, r.id || 0), 0);
+    const newObj = { id: maxId + 1, created_at: new Date().toISOString(), ...obj };
+    arr.push(newObj);
+    this._save();
+    return newObj;
+  }
 
-  -- Pre-computed scores per user per race (snapshotted at result entry time)
-  CREATE TABLE IF NOT EXISTS user_race_scores (
-    user_id INTEGER REFERENCES users(id),
-    race_id INTEGER REFERENCES races(id),
-    score REAL DEFAULT 0,
-    driver1_id INTEGER,
-    driver2_id INTEGER,
-    driver1_name TEXT,
-    driver2_name TEXT,
-    PRIMARY KEY (user_id, race_id)
-  );
+  // Upsert by a key field (e.g. user_picks keyed on user_id)
+  upsert(table, keyField, keyValue, data) {
+    const arr = this.data[table];
+    const idx = arr.findIndex(r => r[keyField] === keyValue);
+    if (idx > -1) {
+      arr[idx] = { ...arr[idx], ...data };
+    } else {
+      arr.push({ ...data });
+    }
+    this._save();
+  }
 
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
-`);
+  // Upsert by composite key
+  upsertBy(table, pred, data) {
+    const arr = this.data[table];
+    const idx = arr.findIndex(pred);
+    if (idx > -1) {
+      arr[idx] = { ...arr[idx], ...data };
+    } else {
+      arr.push({ ...data });
+    }
+    this._save();
+  }
 
-// Default settings (INSERT OR IGNORE = only set if not already present)
-db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('picks_locked', '0')").run();
-db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_handicap', '30.0')").run();
-db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('season_year', '2025')").run();
+  update(table, pred, updates) {
+    let changed = 0;
+    for (const item of this.data[table]) {
+      if (pred(item)) { Object.assign(item, updates); changed++; }
+    }
+    if (changed) this._save();
+    return changed;
+  }
 
-module.exports = db;
+  delete(table, pred) {
+    const before = this.data[table].length;
+    this.data[table] = this.data[table].filter(r => !pred(r));
+    const deleted = before - this.data[table].length;
+    if (deleted) this._save();
+    return deleted;
+  }
+}
+
+module.exports = new JsonDB();

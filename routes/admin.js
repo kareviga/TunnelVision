@@ -3,52 +3,46 @@ const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
 const { computeRaceScores, clearRaceScores } = require('../services/scoringService');
 
-// POST /api/admin/lock — toggle picks lock
+// POST /api/admin/lock
 router.post('/lock', requireAdmin, (req, res) => {
-  const current = db.prepare("SELECT value FROM settings WHERE key = 'picks_locked'").get()?.value;
-  const newVal = current === '1' ? '0' : '1';
-  db.prepare("UPDATE settings SET value = ? WHERE key = 'picks_locked'").run(newVal);
+  const newVal = db.getSetting('picks_locked') === '1' ? '0' : '1';
+  db.setSetting('picks_locked', newVal);
   res.json({ picks_locked: newVal === '1' });
 });
 
-// GET /api/admin/races — all races
+// GET /api/admin/races
 router.get('/races', requireAdmin, (req, res) => {
-  res.json(db.prepare('SELECT * FROM races ORDER BY round ASC').all());
+  res.json(db.all('races').sort((a, b) => a.round - b.round));
 });
 
-// POST /api/admin/races — add a race
+// POST /api/admin/races
 router.post('/races', requireAdmin, (req, res) => {
   const { round, name, circuit, date } = req.body;
   if (!round || !name || !circuit || !date) return res.status(400).json({ error: 'All fields required' });
-  const result = db.prepare('INSERT INTO races (round, name, circuit, date) VALUES (?, ?, ?, ?)').run(round, name, circuit, date);
-  res.json({ id: result.lastInsertRowid });
+  const race = db.insert('races', { round: parseInt(round), name, circuit, date, is_completed: false });
+  res.json({ id: race.id });
 });
 
-// POST /api/admin/races/:id/results — submit race results + compute scores
-// Body: { results: [{ driver_id, points }] }
+// POST /api/admin/races/:id/results
 router.post('/races/:id/results', requireAdmin, (req, res) => {
   const raceId = parseInt(req.params.id);
   const { results } = req.body;
-
   if (!Array.isArray(results) || results.length === 0) {
     return res.status(400).json({ error: 'results array required' });
   }
 
-  // Clear any existing data for idempotency
   clearRaceScores(raceId);
 
-  // Insert raw race results
-  const insertResult = db.prepare(`
-    INSERT OR REPLACE INTO race_results (race_id, driver_id, points) VALUES (?, ?, ?)
-  `);
-  const insertAll = db.transaction(() => {
-    for (const r of results) {
-      if (r.points > 0) insertResult.run(raceId, r.driver_id, r.points);
+  for (const r of results) {
+    if (r.points > 0) {
+      db.upsertBy(
+        'race_results',
+        x => x.race_id === raceId && x.driver_id === r.driver_id,
+        { race_id: raceId, driver_id: r.driver_id, points: r.points }
+      );
     }
-  });
-  insertAll();
+  }
 
-  // Compute and store user scores (also marks race complete + updates driver pts)
   try {
     computeRaceScores(raceId);
     res.json({ success: true });
@@ -57,53 +51,49 @@ router.post('/races/:id/results', requireAdmin, (req, res) => {
   }
 });
 
-// DELETE /api/admin/races/:id/results — wipe results for re-entry
+// DELETE /api/admin/races/:id/results
 router.delete('/races/:id/results', requireAdmin, (req, res) => {
   clearRaceScores(parseInt(req.params.id));
   res.json({ success: true });
 });
 
-// GET /api/admin/drivers — all drivers
+// GET /api/admin/drivers
 router.get('/drivers', requireAdmin, (req, res) => {
-  res.json(db.prepare('SELECT * FROM drivers ORDER BY championship_pts DESC').all());
+  res.json(db.all('drivers').sort((a, b) => b.championship_pts - a.championship_pts));
 });
 
-// PUT /api/admin/drivers/:id — update driver pts or info
+// PUT /api/admin/drivers/:id
 router.put('/drivers/:id', requireAdmin, (req, res) => {
-  const { championship_pts, team, team_color } = req.body;
   const id = parseInt(req.params.id);
-  if (championship_pts !== undefined) {
-    db.prepare('UPDATE drivers SET championship_pts = ? WHERE id = ?').run(championship_pts, id);
-  }
-  if (team) db.prepare('UPDATE drivers SET team = ? WHERE id = ?').run(team, id);
-  if (team_color) db.prepare('UPDATE drivers SET team_color = ? WHERE id = ?').run(team_color, id);
+  const { championship_pts, team, team_color } = req.body;
+  const updates = {};
+  if (championship_pts !== undefined) updates.championship_pts = parseInt(championship_pts);
+  if (team) updates.team = team;
+  if (team_color) updates.team_color = team_color;
+  db.update('drivers', d => d.id === id, updates);
   res.json({ success: true });
 });
 
-// GET /api/admin/users — all users with pick info
+// GET /api/admin/users
 router.get('/users', requireAdmin, (req, res) => {
-  const users = db.prepare('SELECT id, username, is_admin, created_at FROM users').all();
-  const enriched = users.map(u => {
-    const picks = db.prepare('SELECT * FROM user_picks WHERE user_id = ?').get(u.id);
-    const d1 = picks?.driver1_id ? db.prepare('SELECT name FROM drivers WHERE id = ?').get(picks.driver1_id)?.name : null;
-    const d2 = picks?.driver2_id ? db.prepare('SELECT name FROM drivers WHERE id = ?').get(picks.driver2_id)?.name : null;
-    return { ...u, driver1: d1, driver2: d2 };
+  const users = db.all('users').map(u => {
+    const picks = db.findOne('user_picks', r => r.user_id === u.id);
+    const d1 = picks?.driver1_id ? db.findOne('drivers', d => d.id === picks.driver1_id)?.name : null;
+    const d2 = picks?.driver2_id ? db.findOne('drivers', d => d.id === picks.driver2_id)?.name : null;
+    const { password_hash, ...safe } = u;
+    return { ...safe, driver1: d1, driver2: d2 };
   });
-  res.json(enriched);
+  res.json(users);
 });
 
-// GET /api/admin/settings — all settings
+// GET /api/admin/settings
 router.get('/settings', requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT * FROM settings').all();
-  const settings = {};
-  for (const r of rows) settings[r.key] = r.value;
-  res.json(settings);
+  res.json(db.allSettings());
 });
 
 // PUT /api/admin/settings/:key
 router.put('/settings/:key', requireAdmin, (req, res) => {
-  const { value } = req.body;
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(req.params.key, String(value));
+  db.setSetting(req.params.key, req.body.value);
   res.json({ success: true });
 });
 
