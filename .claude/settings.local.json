@@ -18,7 +18,8 @@
       "Bash(export PATH=\"/c/Node/node-v24.14.1-win-x64:$PATH\")",
       "Bash(npm --version)",
       "Bash(export PATH=\"/c/Node/node-v22.22.2-win-x64:$PATH\")",
-      "Bash(node db/seed.js)"
+      "Bash(node db/seed.js)",
+      "Bash(pkill -f \"node server.js\")"
     ]
   }
 }

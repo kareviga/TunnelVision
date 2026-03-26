@@ -4,7 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 
 // GET /api/league/standings
 router.get('/standings', requireAuth, (req, res) => {
-  const users = db.all('users');
+  const users = db.all('users').filter(u => !u.is_admin);
   const drivers = db.all('drivers').sort((a, b) => b.championship_pts - a.championship_pts);
   const leaderPts = drivers[0]?.championship_pts || 0;
   const max = parseFloat(db.getSetting('max_handicap') || '30');

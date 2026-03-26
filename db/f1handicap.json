@@ -6,6 +6,20 @@
       "username": "admin",
       "password_hash": "$2a$10$iYbDXrXyFZEWLyZCQjyiB.mbadLAzGwHhz0XG0nEa69wF79K93vK2",
       "is_admin": true
+    },
+    {
+      "id": 2,
+      "created_at": "2026-03-26T13:38:40.707Z",
+      "username": "Kalle",
+      "password_hash": "$2a$10$aj8vXXSI01q/WDTa2kDHu.juHzMI3GLo/yt8wKGttZUtAFdh6U6Vq",
+      "is_admin": false
+    },
+    {
+      "id": 3,
+      "created_at": "2026-03-26T13:47:21.196Z",
+      "username": "Pizza",
+      "password_hash": "$2a$10$rMj9VYfSkzcrsCWXepupoOLeS2hNdx0cNakjBC7YyRT.ccyx6wxge",
+      "is_admin": false
     }
   ],
   "drivers": [
@@ -210,7 +224,22 @@
       "championship_pts": 0
     }
   ],
-  "user_picks": [],
+  "user_picks": [
+    {
+      "user_id": 2,
+      "driver1_id": 1,
+      "driver2_id": 4,
+      "swaps_used": 0,
+      "last_updated": "2026-03-26T13:43:22.968Z"
+    },
+    {
+      "user_id": 3,
+      "driver1_id": 15,
+      "driver2_id": 14,
+      "swaps_used": 0,
+      "last_updated": "2026-03-26T13:48:15.252Z"
+    }
+  ],
   "races": [
     {
       "id": 1,

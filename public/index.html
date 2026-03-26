@@ -1,295 +1,500 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="no">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F1 × Handicap</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<title>sygeniceF1</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --red: #E8002D;
-    --orange: #FF8000;
-    --teal: #27F4D2;
-    --bg: #080808;
-    --card: #111111;
-    --border: #1e1e1e;
-    --text: #ffffff;
-    --muted: #666666;
-    --sub: #aaaaaa;
+    --pink:    #FF00AA;
+    --cyan:    #00FFFF;
+    --yellow:  #FFE600;
+    --green:   #00FF88;
+    --purple:  #9B00FF;
+    --bg:      #08000F;
+    --card:    #110018;
+    --card2:   #1A0028;
+    --border:  #3D0060;
+    --text:    #F0E0FF;
+    --muted:   #6644AA;
+    --sub:     #AA88CC;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; max-width: 430px; margin: 0 auto; position: relative; overflow-x: hidden; }
+
+  body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ── GRID BACKGROUND ── */
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(155,0,255,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(155,0,255,0.07) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SCANLINES ── */
+  body::after {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 3px,
+      rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #auth-screen, #app { position: relative; z-index: 1; }
 
   /* ── HEADER ── */
   .header {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(8,8,8,0.95); backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
+    background: rgba(8,0,15,0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--pink);
+    box-shadow: 0 0 16px rgba(255,0,170,0.25);
     padding: 0 16px;
     height: 52px; display: flex; align-items: center; justify-content: space-between;
   }
-  .logo { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 900; letter-spacing: 0.05em; }
-  .logo span { color: var(--red); }
+
+  .logo {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.75rem;
+    color: var(--pink);
+    text-shadow: 0 0 8px var(--pink), 0 0 20px var(--pink);
+    letter-spacing: 0.02em;
+  }
+
   .race-pill {
-    background: #1a0000; border: 1px solid var(--red);
-    color: var(--red); font-size: 0.65rem; font-weight: 700;
-    padding: 3px 8px; border-radius: 4px; letter-spacing: 0.08em;
+    background: rgba(255,0,170,0.12);
+    border: 1px solid var(--pink);
+    color: var(--pink);
+    font-family: 'VT323', monospace;
+    font-size: 0.95rem;
+    padding: 2px 10px; border-radius: 3px; letter-spacing: 0.1em;
+    text-shadow: 0 0 6px var(--pink);
     animation: pulse 2s infinite;
   }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
   /* ── BOTTOM NAV ── */
   .bottom-nav {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
     width: 100%; max-width: 430px;
-    background: rgba(10,10,10,0.97); backdrop-filter: blur(16px);
+    background: rgba(8,0,15,0.97); backdrop-filter: blur(16px);
     border-top: 1px solid var(--border);
-    display: flex; height: 60px;
+    display: flex; height: 62px;
     z-index: 50;
   }
   .nav-item {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 3px; cursor: pointer; transition: color 0.15s;
-    color: var(--muted); font-size: 0.65rem; font-weight: 600;
-    letter-spacing: 0.05em; text-transform: uppercase;
+    gap: 3px; cursor: pointer; transition: all 0.15s;
+    color: var(--muted);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
     border: none; background: none;
   }
-  .nav-item.active { color: var(--orange); }
+  .nav-item.active {
+    color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  .nav-item.active svg { filter: drop-shadow(0 0 4px var(--cyan)); }
   .nav-item svg { width: 20px; height: 20px; }
 
   /* ── SCREENS ── */
-  .screen { display: none; padding: 16px 16px 80px; animation: fadeIn 0.2s ease; }
+  .screen { display: none; padding: 16px 16px 84px; animation: fadeIn 0.2s ease; }
   .screen.active { display: block; }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
   /* ── TYPOGRAPHY ── */
-  .page-title { font-family: 'Barlow Condensed', sans-serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
-  .page-sub { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+  .page-title {
+    font-family: 'VT323', monospace;
+    font-size: 2.8rem; line-height: 1;
+    color: var(--cyan);
+    text-shadow: 0 0 12px var(--cyan), 0 0 30px rgba(0,255,255,0.4);
+    letter-spacing: 0.05em;
+  }
+  .page-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; letter-spacing: 0.05em; }
+
   .section-label {
-    font-family: 'Barlow Condensed', sans-serif; font-size: 0.7rem; font-weight: 700;
-    color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase;
-    margin: 20px 0 10px;
+    font-family: 'VT323', monospace;
+    font-size: 1.1rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--pink);
+    text-shadow: 0 0 8px var(--pink);
+    margin: 22px 0 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1; height: 1px;
+    background: linear-gradient(to right, var(--pink), transparent);
+    opacity: 0.4;
   }
 
   /* ── CARDS ── */
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px;
+  }
   .card + .card { margin-top: 8px; }
 
   /* ── STAT ROW ── */
   .stat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 16px 0; }
   .stat-card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 10px;
-    border-left: 3px solid var(--red);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 10px;
+    border-top: 2px solid var(--pink);
+    position: relative; overflow: hidden;
   }
-  .stat-card:nth-child(2) { border-left-color: var(--orange); }
-  .stat-card:nth-child(3) { border-left-color: var(--teal); }
-  .stat-val { font-family: 'Barlow Condensed', sans-serif; font-size: 1.6rem; font-weight: 900; color: var(--red); line-height: 1; }
-  .stat-card:nth-child(2) .stat-val { color: var(--orange); }
-  .stat-card:nth-child(3) .stat-val { color: var(--teal); }
-  .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    box-shadow: 0 0 12px var(--pink);
+  }
+  .stat-card:nth-child(2) { border-top-color: var(--cyan); }
+  .stat-card:nth-child(2)::before { box-shadow: 0 0 12px var(--cyan); }
+  .stat-card:nth-child(3) { border-top-color: var(--yellow); }
+  .stat-card:nth-child(3)::before { box-shadow: 0 0 12px var(--yellow); }
+  .stat-val {
+    font-family: 'VT323', monospace;
+    font-size: 2rem; font-weight: 400;
+    color: var(--pink); line-height: 1;
+    text-shadow: 0 0 10px var(--pink);
+  }
+  .stat-card:nth-child(2) .stat-val { color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+  .stat-card:nth-child(3) .stat-val { color: var(--yellow); text-shadow: 0 0 10px var(--yellow); }
+  .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
 
   /* ── DRIVER CARDS ── */
   .driver-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .driver-card {
-    background: var(--card); border: 1px solid var(--border);
+    background: var(--card);
+    border: 1px solid var(--border);
     border-left: 3px solid;
-    border-radius: 10px; padding: 12px;
+    border-radius: 6px; padding: 12px;
+    position: relative;
   }
-  .driver-num { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 900; line-height: 1; }
-  .driver-name { font-size: 0.85rem; font-weight: 600; margin-top: 6px; }
-  .driver-team { font-size: 0.72rem; margin-top: 2px; }
-  .driver-hf { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.75rem; color: var(--sub); }
-  .driver-hf .hf { color: var(--orange); font-weight: 700; }
+  .driver-num {
+    font-family: 'VT323', monospace;
+    font-size: 2.8rem; font-weight: 400; line-height: 1;
+  }
+  .driver-name { font-size: 0.9rem; font-weight: 600; margin-top: 6px; letter-spacing: 0.03em; }
+  .driver-team { font-size: 0.72rem; margin-top: 2px; letter-spacing: 0.05em; }
+  .driver-hf {
+    display: flex; justify-content: space-between;
+    margin-top: 10px; font-size: 0.8rem; color: var(--sub);
+    font-family: 'VT323', monospace; font-size: 1rem; letter-spacing: 0.05em;
+  }
+  .driver-hf .hf { color: var(--yellow); text-shadow: 0 0 6px var(--yellow); }
 
   /* ── LEADERBOARD ── */
   .lb-row {
     display: flex; align-items: center; gap: 12px;
     padding: 12px 14px;
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; margin-bottom: 6px;
+    border-radius: 6px; margin-bottom: 6px;
+    transition: transform 0.1s;
   }
-  .lb-row.me { background: #1a0a00; border-color: var(--orange); }
-  .lb-rank { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 800; width: 32px; text-align: center; }
+  .lb-row.me {
+    background: rgba(0,255,255,0.05);
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,255,255,0.15);
+  }
+  .lb-rank {
+    font-family: 'VT323', monospace;
+    font-size: 1.6rem; font-weight: 400; width: 36px; text-align: center;
+  }
   .lb-info { flex: 1; }
-  .lb-name { font-weight: 600; font-size: 0.9rem; }
-  .lb-name.me { color: var(--orange); }
-  .lb-picks { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
-  .lb-score { font-family: 'Barlow Condensed', sans-serif; font-size: 1.8rem; font-weight: 900; }
-  .gold { color: #FFD700; }
-  .silver { color: #C0C0C0; }
-  .bronze { color: #CD7F32; }
+  .lb-name { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.05em; }
+  .lb-name.me { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+  .lb-picks { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .lb-score { font-family: 'VT323', monospace; font-size: 2rem; font-weight: 400; }
+  .gold   { color: #FFD700; text-shadow: 0 0 10px #FFD700; }
+  .silver { color: #C0C0C0; text-shadow: 0 0 8px #C0C0C0; }
+  .bronze { color: #FF6622; text-shadow: 0 0 8px #FF6622; }
 
   /* ── RACE LOG ── */
   .race-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 14px;
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 8px; margin-bottom: 6px;
+    border-radius: 6px; margin-bottom: 6px;
   }
-  .race-round { font-family: 'Barlow Condensed', sans-serif; color: var(--red); font-weight: 700; font-size: 0.8rem; margin-right: 8px; }
-  .race-name { font-size: 0.85rem; color: var(--sub); }
-  .race-pts { font-family: 'Barlow Condensed', sans-serif; color: var(--orange); font-weight: 700; font-size: 1.1rem; }
+  .race-round {
+    font-family: 'VT323', monospace;
+    color: var(--pink); font-size: 1rem; letter-spacing: 0.08em;
+    margin-right: 8px; text-shadow: 0 0 6px var(--pink);
+  }
+  .race-name { font-size: 0.88rem; color: var(--sub); }
+  .race-pts {
+    font-family: 'VT323', monospace;
+    color: var(--green); font-size: 1.3rem;
+    text-shadow: 0 0 8px var(--green);
+  }
 
   /* ── PICKS GRID ── */
   .pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .pick-card {
     background: var(--card); border: 2px solid var(--border);
-    border-radius: 10px; padding: 12px;
+    border-radius: 6px; padding: 12px;
     position: relative; cursor: pointer; transition: all 0.15s;
   }
-  .pick-card.selected { border-color: var(--orange); background: rgba(255,128,0,0.08); }
-  .pick-check { position: absolute; top: 8px; right: 10px; font-size: 1rem; color: var(--orange); }
-  .pick-hf { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.72rem; color: var(--muted); }
-  .pick-hf .mult { color: var(--orange); font-weight: 700; }
+  .pick-card:hover { border-color: var(--purple); }
+  .pick-card.selected {
+    border-color: var(--cyan);
+    background: rgba(0,255,255,0.06);
+    box-shadow: 0 0 12px rgba(0,255,255,0.2);
+  }
+  .pick-check {
+    position: absolute; top: 8px; right: 10px;
+    font-family: 'VT323', monospace; font-size: 1.2rem;
+    color: var(--cyan); text-shadow: 0 0 8px var(--cyan);
+  }
+  .pick-hf {
+    display: flex; justify-content: space-between;
+    margin-top: 8px;
+    font-family: 'VT323', monospace; font-size: 1rem;
+    color: var(--muted); letter-spacing: 0.05em;
+  }
+  .pick-hf .mult { color: var(--yellow); text-shadow: 0 0 6px var(--yellow); }
 
   /* ── NEXT RACE ── */
   .next-race {
-    background: var(--card); border: 1px solid #2a2a2a;
-    border-radius: 10px; padding: 14px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px;
     display: flex; justify-content: space-between; align-items: center;
   }
-  .next-round { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
-  .next-name { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 800; margin-top: 2px; }
-  .next-detail { font-size: 0.78rem; color: var(--sub); margin-top: 2px; }
+  .next-round { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+  .next-name {
+    font-family: 'VT323', monospace; font-size: 1.6rem;
+    color: var(--cyan); text-shadow: 0 0 8px var(--cyan);
+    margin-top: 2px;
+  }
+  .next-detail { font-size: 0.8rem; color: var(--sub); margin-top: 2px; }
   .locked-pill {
-    background: #1a0000; border: 1px solid var(--red); color: var(--red);
-    font-size: 0.65rem; font-weight: 700; padding: 4px 8px; border-radius: 4px;
-    white-space: nowrap;
+    background: rgba(255,0,170,0.1); border: 1px solid var(--pink); color: var(--pink);
+    font-family: 'VT323', monospace; font-size: 0.95rem;
+    padding: 3px 10px; border-radius: 3px; letter-spacing: 0.1em;
+    text-shadow: 0 0 6px var(--pink); white-space: nowrap;
   }
   .open-pill {
-    background: #001a00; border: 1px solid #229971; color: #52E252;
-    font-size: 0.65rem; font-weight: 700; padding: 4px 8px; border-radius: 4px;
-    white-space: nowrap;
+    background: rgba(0,255,136,0.1); border: 1px solid var(--green); color: var(--green);
+    font-family: 'VT323', monospace; font-size: 0.95rem;
+    padding: 3px 10px; border-radius: 3px; letter-spacing: 0.1em;
+    text-shadow: 0 0 6px var(--green); white-space: nowrap;
   }
 
   /* ── SEARCH ── */
   .search-bar {
-    background: var(--card); border: 1px solid #2a2a2a;
-    border-radius: 8px; padding: 10px 14px;
-    color: var(--text); font-family: 'Barlow', sans-serif; font-size: 0.9rem;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 14px;
+    color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 0.95rem;
     width: 100%; outline: none; margin-bottom: 12px;
+    transition: border-color 0.15s;
   }
+  .search-bar:focus { border-color: var(--purple); box-shadow: 0 0 8px rgba(155,0,255,0.3); }
   .search-bar::placeholder { color: var(--muted); }
 
-  /* ── BTN ── */
+  /* ── BUTTONS ── */
   .btn {
-    background: var(--red); border: none; color: #fff;
-    padding: 13px 24px; border-radius: 8px;
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-    font-size: 1rem; letter-spacing: 0.05em; cursor: pointer;
-    width: 100%; margin-top: 16px;
-    transition: opacity 0.15s;
+    border: 2px solid var(--pink); background: rgba(255,0,170,0.12); color: var(--pink);
+    padding: 12px 24px; border-radius: 4px;
+    font-family: 'VT323', monospace; font-size: 1.2rem; letter-spacing: 0.12em;
+    cursor: pointer; width: 100%; margin-top: 16px;
+    text-shadow: 0 0 8px var(--pink);
+    box-shadow: 0 0 12px rgba(255,0,170,0.2);
+    transition: all 0.15s;
   }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-green { background: #229971; }
-  .btn-outline { background: transparent; border: 1px solid var(--red); color: var(--red); margin-top: 8px; }
-  .btn-sm {
-    padding: 8px 16px; font-size: 0.85rem; width: auto;
-    margin-top: 0; border-radius: 6px;
+  .btn:hover:not(:disabled) {
+    background: rgba(255,0,170,0.22);
+    box-shadow: 0 0 20px rgba(255,0,170,0.4);
+  }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-cyan {
+    border-color: var(--cyan); background: rgba(0,255,255,0.08); color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan); box-shadow: 0 0 12px rgba(0,255,255,0.2);
+  }
+  .btn-cyan:hover:not(:disabled) {
+    background: rgba(0,255,255,0.16);
+    box-shadow: 0 0 20px rgba(0,255,255,0.4);
+  }
+  .btn-green {
+    border-color: var(--green); background: rgba(0,255,136,0.08); color: var(--green);
+    text-shadow: 0 0 8px var(--green); box-shadow: 0 0 12px rgba(0,255,136,0.2);
+  }
+  .btn-green:hover:not(:disabled) {
+    background: rgba(0,255,136,0.16);
+    box-shadow: 0 0 20px rgba(0,255,136,0.4);
   }
 
   /* ── LOGIN ── */
   #auth-screen {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     min-height: 100vh; padding: 32px 24px;
-    background: radial-gradient(ellipse at 50% 0%, #1a0000 0%, var(--bg) 65%);
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(155,0,255,0.25) 0%, transparent 65%),
+      radial-gradient(ellipse at 50% 100%, rgba(255,0,170,0.15) 0%, transparent 60%);
   }
-  .auth-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 3rem; font-weight: 900; letter-spacing: -0.02em; text-align: center; }
-  .auth-sub { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 4px; margin-bottom: 32px; }
-  .input {
-    background: var(--card); border: 1px solid #2a2a2a;
-    border-radius: 8px; padding: 12px 14px;
-    color: var(--text); font-family: 'Barlow', sans-serif; font-size: 0.95rem;
-    width: 100%; outline: none; margin-bottom: 10px; display: block;
-    transition: border-color 0.15s;
+  .auth-logo {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 1.3rem; letter-spacing: 0.05em;
+    text-align: center;
+    color: var(--pink);
+    text-shadow: 0 0 16px var(--pink), 0 0 40px rgba(255,0,170,0.5);
+    line-height: 1.5;
   }
-  .input:focus { border-color: var(--red); }
+  .auth-logo .f1 { color: var(--cyan); text-shadow: 0 0 16px var(--cyan); }
+  .auth-sub {
+    color: var(--muted);
+    font-family: 'VT323', monospace; font-size: 1.1rem; letter-spacing: 0.25em;
+    text-transform: uppercase; margin-top: 8px; margin-bottom: 36px;
+  }
   .auth-form { width: 100%; max-width: 340px; }
-  .auth-toggle { color: var(--muted); font-size: 0.82rem; margin-top: 16px; text-align: center; }
-  .auth-toggle span { color: var(--red); cursor: pointer; }
   .auth-tab { display: none; }
   .auth-tab.active { display: block; }
+  .auth-toggle {
+    color: var(--muted); font-size: 0.85rem; margin-top: 16px; text-align: center;
+    letter-spacing: 0.03em;
+  }
+  .auth-toggle span { color: var(--cyan); cursor: pointer; text-shadow: 0 0 6px var(--cyan); }
+
+  .input {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 4px; padding: 12px 14px;
+    color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 1rem;
+    width: 100%; outline: none; margin-bottom: 10px; display: block;
+    letter-spacing: 0.04em; transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--purple); box-shadow: 0 0 10px rgba(155,0,255,0.3); }
+  .input::placeholder { color: var(--muted); }
 
   /* ── ADMIN ── */
   .admin-lock-btn {
-    background: #229971; border: none; color: #fff;
-    padding: 16px 24px; border-radius: 8px;
-    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-    font-size: 1.1rem; letter-spacing: 0.05em; cursor: pointer;
-    width: 100%; margin-bottom: 8px; transition: background 0.2s;
+    border: 2px solid var(--green); background: rgba(0,255,136,0.1); color: var(--green);
+    padding: 14px 24px; border-radius: 4px;
+    font-family: 'VT323', monospace; font-size: 1.3rem; letter-spacing: 0.12em;
+    cursor: pointer; width: 100%; margin-bottom: 8px;
+    text-shadow: 0 0 8px var(--green); box-shadow: 0 0 14px rgba(0,255,136,0.2);
+    transition: all 0.2s;
   }
-  .admin-lock-btn.locked { background: var(--red); }
-  .admin-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  .admin-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 0; border-bottom: 1px solid var(--border); }
-  .admin-table td { padding: 8px 0; border-bottom: 1px solid #161616; vertical-align: middle; }
+  .admin-lock-btn.locked {
+    border-color: var(--pink); background: rgba(255,0,170,0.1); color: var(--pink);
+    text-shadow: 0 0 8px var(--pink); box-shadow: 0 0 14px rgba(255,0,170,0.2);
+  }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .admin-table th {
+    text-align: left; color: var(--muted); font-weight: 700;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+    font-family: 'VT323', monospace; font-size: 1rem; letter-spacing: 0.1em;
+  }
+  .admin-table td { padding: 8px 0; border-bottom: 1px solid #1A0028; vertical-align: middle; }
   .pts-input {
-    background: #1a1a1a; border: 1px solid var(--border); color: var(--text);
-    padding: 4px 8px; border-radius: 4px; width: 70px; font-size: 0.82rem;
-    font-family: 'Barlow', sans-serif;
+    background: var(--card2); border: 1px solid var(--border); color: var(--text);
+    padding: 4px 8px; border-radius: 3px; width: 70px; font-size: 0.85rem;
+    font-family: 'Rajdhani', sans-serif;
   }
   .race-select {
-    background: var(--card); border: 1px solid #2a2a2a; color: var(--text);
-    padding: 10px 14px; border-radius: 8px; width: 100%; font-size: 0.9rem;
-    font-family: 'Barlow', sans-serif; outline: none; margin-bottom: 12px;
-    cursor: pointer;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 14px; border-radius: 4px; width: 100%; font-size: 0.95rem;
+    font-family: 'Rajdhani', sans-serif; outline: none; margin-bottom: 12px; cursor: pointer;
+    letter-spacing: 0.03em;
   }
 
-  /* ── SWAP BANNER ── */
+  /* ── BANNERS ── */
   .swap-banner {
-    background: #0a1a0a; border: 1px solid #229971; color: #52E252;
-    padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px;
+    background: rgba(0,255,136,0.07); border: 1px solid rgba(0,255,136,0.4); color: var(--green);
+    padding: 10px 14px; border-radius: 4px; font-size: 0.85rem; margin-bottom: 12px;
+    letter-spacing: 0.03em;
   }
   .lock-banner {
-    background: #1a0000; border: 1px solid var(--red); color: var(--red);
-    padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px;
+    background: rgba(255,0,170,0.07); border: 1px solid rgba(255,0,170,0.4); color: var(--pink);
+    padding: 10px 14px; border-radius: 4px; font-size: 0.85rem; margin-bottom: 12px;
+  }
+  .info-banner {
+    background: rgba(0,255,255,0.05); border: 1px solid rgba(0,255,255,0.25); color: var(--cyan);
+    padding: 10px 14px; border-radius: 4px; font-size: 0.85rem; margin-bottom: 12px;
   }
 
   /* ── TOAST ── */
   .toast {
-    position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
-    background: #1a1a1a; border: 1px solid #333; color: var(--text);
-    padding: 10px 20px; border-radius: 8px; font-size: 0.85rem;
+    position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%);
+    background: var(--card2); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 20px; border-radius: 4px;
+    font-family: 'VT323', monospace; font-size: 1.1rem; letter-spacing: 0.08em;
     z-index: 200; opacity: 0; transition: opacity 0.2s;
     white-space: nowrap; pointer-events: none;
   }
   .toast.show { opacity: 1; }
-  .toast.success { border-color: #229971; color: #52E252; }
-  .toast.error { border-color: var(--red); color: var(--red); }
+  .toast.success { border-color: var(--green); color: var(--green); text-shadow: 0 0 6px var(--green); }
+  .toast.error   { border-color: var(--pink);  color: var(--pink);  text-shadow: 0 0 6px var(--pink); }
 
   /* ── EMPTY STATE ── */
-  .empty { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 32px 0; }
-
-  /* ── NO PICKS WARNING ── */
-  .no-picks-banner {
-    background: #0a0a1a; border: 1px solid #3671C6; color: #6699ff;
-    padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px;
+  .empty {
+    text-align: center; color: var(--muted);
+    font-family: 'VT323', monospace; font-size: 1.2rem; letter-spacing: 0.1em;
+    padding: 32px 0;
   }
+
+  /* ── POENGSYSTEM ── */
+  .points-block {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px; margin-bottom: 12px;
+  }
+  .points-block h3 {
+    font-family: 'VT323', monospace; font-size: 1.3rem; letter-spacing: 0.12em;
+    color: var(--yellow); text-shadow: 0 0 8px var(--yellow); margin-bottom: 10px;
+  }
+  .points-block p { font-size: 0.9rem; color: var(--sub); line-height: 1.7; margin-bottom: 8px; }
+  .points-block p:last-child { margin-bottom: 0; }
+  .formula {
+    background: rgba(155,0,255,0.12); border: 1px solid rgba(155,0,255,0.4);
+    border-radius: 4px; padding: 10px 14px; margin: 10px 0;
+    font-family: 'VT323', monospace; font-size: 1.15rem; letter-spacing: 0.06em;
+    color: var(--cyan); text-shadow: 0 0 6px var(--cyan); line-height: 1.6;
+  }
+  .pts-table { width: 100%; font-size: 0.88rem; border-collapse: collapse; }
+  .pts-table td { padding: 5px 0; color: var(--sub); }
+  .pts-table td:first-child { color: var(--pink); font-family: 'VT323', monospace; font-size: 1.05rem; width: 60px; }
+  .pts-table td:last-child { color: var(--yellow); font-family: 'VT323', monospace; font-size: 1.05rem; text-align: right; }
 </style>
 </head>
 <body>
 
-<!-- ══ AUTH SCREEN ══════════════════════════════════════════════════════ -->
+<!-- ══ AUTH SCREEN ═══════════════════════════════════════════════════════ -->
 <div id="auth-screen">
-  <div class="auth-logo">F1<span style="color:var(--red)">×</span>HANDICAP</div>
-  <div class="auth-sub">Fantasy League · 2025</div>
+  <div class="auth-logo">sygenic<span class="f1">F1</span></div>
+  <div class="auth-sub">Handicap Fantasy · 2025</div>
 
   <div class="auth-form">
-    <!-- Login tab -->
     <div id="tab-login" class="auth-tab active">
-      <input class="input" id="login-username" placeholder="Username" autocomplete="username">
-      <input class="input" id="login-password" type="password" placeholder="Password" autocomplete="current-password">
-      <button class="btn" id="btn-login">Enter</button>
-      <p class="auth-toggle">No account? <span onclick="showAuthTab('register')">Register</span></p>
+      <input class="input" id="login-username" placeholder="Brukernavn" autocomplete="username">
+      <input class="input" id="login-password" type="password" placeholder="Passord" autocomplete="current-password">
+      <button class="btn" id="btn-login">LOGG INN</button>
+      <p class="auth-toggle">Ingen konto? <span onclick="showAuthTab('register')">Registrer deg</span></p>
     </div>
 
-    <!-- Register tab -->
     <div id="tab-register" class="auth-tab">
-      <input class="input" id="reg-username" placeholder="Choose username" autocomplete="username">
-      <input class="input" id="reg-password" type="password" placeholder="Choose password (min 4 chars)" autocomplete="new-password">
-      <input class="input" id="reg-confirm" type="password" placeholder="Confirm password" autocomplete="new-password">
-      <button class="btn" id="btn-register">Create Account</button>
-      <p class="auth-toggle">Already have an account? <span onclick="showAuthTab('login')">Login</span></p>
+      <input class="input" id="reg-username" placeholder="Velg brukernavn" autocomplete="username">
+      <input class="input" id="reg-password" type="password" placeholder="Velg passord (min. 4 tegn)" autocomplete="new-password">
+      <input class="input" id="reg-confirm"  type="password" placeholder="Bekreft passord" autocomplete="new-password">
+      <button class="btn btn-cyan" id="btn-register">OPPRETT KONTO</button>
+      <p class="auth-toggle">Har du konto? <span onclick="showAuthTab('login')">Logg inn</span></p>
     </div>
   </div>
 </div>
@@ -298,115 +503,169 @@
 <div id="app" style="display:none">
 
   <header class="header">
-    <div class="logo">F1<span>×</span>H</div>
-    <div id="header-pill" class="race-pill" style="display:none">🏁 RACE WEEKEND</div>
+    <div class="logo">sygeniceF1</div>
+    <div id="header-pill" class="race-pill" style="display:none">⬛ RACE WEEKEND</div>
     <div style="display:flex;align-items:center;gap:10px">
-      <div id="header-user" style="color:var(--muted);font-size:0.82rem"></div>
-      <div style="color:var(--muted);font-size:0.75rem;cursor:pointer" onclick="logout()">✕</div>
+      <div id="header-user" style="color:var(--sub);font-size:0.82rem;font-family:'VT323',monospace;font-size:1rem;letter-spacing:0.06em"></div>
+      <div style="color:var(--muted);font-size:0.8rem;cursor:pointer;letter-spacing:0.05em" onclick="logout()">[ UT ]</div>
     </div>
   </header>
 
-  <!-- ── MY TEAM ── -->
+  <!-- ── MITT LAG ── -->
   <div class="screen active" id="s-team">
     <div style="margin-bottom:4px">
-      <div class="page-title">My Team</div>
-      <div class="page-sub">Season 2025 · Handicap League</div>
+      <div class="page-title">MITT LAG</div>
+      <div class="page-sub">Sesong 2025 · Handicap-liga</div>
     </div>
 
     <div class="stat-row">
-      <div class="stat-card"><div class="stat-val" id="team-pts">—</div><div class="stat-label">Points</div></div>
-      <div class="stat-card"><div class="stat-val" id="team-rank">—</div><div class="stat-label">Rank</div></div>
-      <div class="stat-card"><div class="stat-val" id="team-swaps">—</div><div class="stat-label">Swaps</div></div>
+      <div class="stat-card"><div class="stat-val" id="team-pts">—</div><div class="stat-label">Poeng</div></div>
+      <div class="stat-card"><div class="stat-val" id="team-rank">—</div><div class="stat-label">Plass</div></div>
+      <div class="stat-card"><div class="stat-val" id="team-swaps">—</div><div class="stat-label">Bytter</div></div>
     </div>
 
-    <div id="no-picks-msg" class="no-picks-banner" style="display:none">
-      ⚡ You haven't picked your drivers yet — head to the Drivers tab!
+    <div id="no-picks-msg" class="info-banner" style="display:none">
+      ⚡ Du har ikke valgt sjåfører ennå — gå til Sjåfører-fanen!
     </div>
 
-    <div class="section-label">Your Drivers</div>
+    <div class="section-label">Dine sjåfører</div>
     <div class="driver-row" id="team-drivers">
-      <div class="driver-card" style="border-left-color:var(--border);color:var(--muted)">
+      <div class="driver-card" style="border-left-color:var(--border)">
         <div class="driver-num" style="color:var(--muted)">?</div>
-        <div class="driver-name">No pick yet</div>
+        <div class="driver-name" style="color:var(--muted)">Ikke valgt</div>
       </div>
-      <div class="driver-card" style="border-left-color:var(--border);color:var(--muted)">
+      <div class="driver-card" style="border-left-color:var(--border)">
         <div class="driver-num" style="color:var(--muted)">?</div>
-        <div class="driver-name">No pick yet</div>
+        <div class="driver-name" style="color:var(--muted)">Ikke valgt</div>
       </div>
     </div>
 
-    <div class="section-label">Race Results</div>
-    <div id="team-races"><div class="empty">No completed races yet</div></div>
+    <div class="section-label">Raceresultater</div>
+    <div id="team-races"><div class="empty">Ingen fullførte race ennå</div></div>
 
-    <div class="section-label">Next Race</div>
+    <div class="section-label">Neste race</div>
     <div id="team-next"><div class="empty">—</div></div>
   </div>
 
-  <!-- ── DRIVERS ── -->
+  <!-- ── SJÅFØRER ── -->
   <div class="screen" id="s-drivers">
     <div style="margin-bottom:4px">
-      <div class="page-title">Pick Drivers</div>
-      <div class="page-sub">Choose 2 drivers for your team</div>
+      <div class="page-title">SJÅFØRER</div>
+      <div class="page-sub">Velg 2 sjåfører til laget ditt</div>
     </div>
 
     <div id="picks-lock-banner" class="lock-banner" style="display:none">
-      🔒 Picks are locked — race weekend in progress
+      🔒 Valg er låst — race weekend pågår
     </div>
     <div id="picks-open-banner" class="swap-banner" style="display:none">
-      ✓ Picks are open — make your selection below
+      ✓ Valg er åpne — gjør ditt utvalg nedenfor
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-size:0.78rem;color:var(--muted)">Sorted by championship pts</div>
-      <div id="picks-count" style="font-family:'Barlow Condensed',sans-serif;color:var(--orange);font-weight:700;font-size:1.1rem">0/2</div>
+      <div style="font-size:0.82rem;color:var(--muted)">Sortert etter VM-poeng</div>
+      <div id="picks-count" style="font-family:'VT323',monospace;color:var(--yellow);font-size:1.4rem;text-shadow:0 0 8px var(--yellow)">0/2</div>
     </div>
 
     <div class="pick-grid" id="drivers-grid"></div>
-    <button class="btn" id="btn-save-picks" disabled onclick="savePicks()">Save Picks</button>
+    <button class="btn btn-cyan" id="btn-save-picks" disabled onclick="savePicks()">LAGRE VALG</button>
   </div>
 
-  <!-- ── LEADERBOARD ── -->
+  <!-- ── TABELL ── -->
   <div class="screen" id="s-lb">
     <div style="margin-bottom:4px">
-      <div class="page-title">Standings</div>
-      <div class="page-sub" id="lb-sub">League standings</div>
+      <div class="page-title">TABELL</div>
+      <div class="page-sub" id="lb-sub">Ligastabell</div>
     </div>
     <div style="margin-top:16px" id="lb-list"></div>
+  </div>
+
+  <!-- ── POENGSYSTEM ── -->
+  <div class="screen" id="s-points">
+    <div style="margin-bottom:4px">
+      <div class="page-title">POENGSYSTEM</div>
+      <div class="page-sub">Slik fungerer handicap-ligaen</div>
+    </div>
+
+    <div class="section-label">Konsept</div>
+    <div class="points-block">
+      <p>Alle spillere velger <strong style="color:var(--cyan)">2 sjåfører</strong> fra hele F1-feltet. Det er ingen begrensninger på hvem du velger — men systemet straffer deg for å velge favoritter!</p>
+      <p>Jo bedre en sjåfør gjør det i VM-sammendraget, desto <strong style="color:var(--pink)">lavere multiplikator</strong> får du for den sjåføren.</p>
+    </div>
+
+    <div class="section-label">Handicap-multiplikator</div>
+    <div class="points-block">
+      <p>Multiplikatoren beregnes automatisk etter hvert race:</p>
+      <div class="formula">
+        Multiplikator = Leder-VM-poeng ÷ Sjåførens VM-poeng
+      </div>
+      <p><strong style="color:var(--yellow)">Eksempel:</strong> Verstappen leder med 250 poeng. Hülkenberg har 12 poeng.</p>
+      <div class="formula">
+        Hülkenberg-multiplikator = 250 ÷ 12 = ×20.8
+      </div>
+      <p>Velger du Hülkenberg og han scorer 10 poeng i et race, får du 10 × 20.8 = <strong style="color:var(--green)">208 poeng!</strong></p>
+    </div>
+
+    <div class="section-label">F1-poeng per race</div>
+    <div class="points-block">
+      <p>Standard F1-poeng som brukes som grunnlag:</p>
+      <table class="pts-table" style="margin-top:8px">
+        <tr><td>P1</td><td>Seier</td><td>25 pts</td></tr>
+        <tr><td>P2</td><td>2. plass</td><td>18 pts</td></tr>
+        <tr><td>P3</td><td>3. plass</td><td>15 pts</td></tr>
+        <tr><td>P4</td><td>4. plass</td><td>12 pts</td></tr>
+        <tr><td>P5</td><td>5. plass</td><td>10 pts</td></tr>
+        <tr><td>P6</td><td>6. plass</td><td>8 pts</td></tr>
+        <tr><td>P7</td><td>7. plass</td><td>6 pts</td></tr>
+        <tr><td>P8</td><td>8. plass</td><td>4 pts</td></tr>
+        <tr><td>P9</td><td>9. plass</td><td>2 pts</td></tr>
+        <tr><td>P10</td><td>10. plass</td><td>1 pt</td></tr>
+      </table>
+    </div>
+
+    <div class="section-label">Din racepoengsum</div>
+    <div class="points-block">
+      <div class="formula">
+        Dine poeng = (Sjåfør 1 race-pts × Multiplikator 1) + (Sjåfør 2 race-pts × Multiplikator 2)
+      </div>
+      <p>Multiplene oppdateres etter hvert race basert på oppdatert VM-stilling. Sesongpoengene er summen av alle race.</p>
+    </div>
+
+    <div class="section-label">Strategi</div>
+    <div class="points-block">
+      <p>🏆 <strong style="color:var(--yellow)">Favorittstrategi:</strong> Velg Verstappen og Norris for stabilt, men med lav multiplikator.</p>
+      <p>🎲 <strong style="color:var(--pink)">Underdogstrategi:</strong> Velg midtfelt-sjåfører med høy multiplikator — ett godt resultat kan gi enorme poeng!</p>
+      <p>⚡ <strong style="color:var(--green)">Bytter:</strong> Du kan bytte sjåfører når som helst — <strong>med mindre admin låser valget</strong> i race-helgen.</p>
+    </div>
   </div>
 
   <!-- ── ADMIN ── -->
   <div class="screen" id="s-admin">
     <div style="margin-bottom:16px">
-      <div class="page-title">Admin</div>
-      <div class="page-sub">League management</div>
+      <div class="page-title">ADMIN</div>
+      <div class="page-sub">Ligaadministrasjon</div>
     </div>
 
-    <!-- Lock toggle -->
-    <div class="section-label">Picks Control</div>
-    <button id="btn-lock" class="admin-lock-btn" onclick="toggleLock()">Loading…</button>
-    <p style="font-size:0.75rem;color:var(--muted)">Lock picks before each race weekend, unlock after.</p>
+    <div class="section-label">Valg-kontroll</div>
+    <button id="btn-lock" class="admin-lock-btn" onclick="toggleLock()">Laster…</button>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:4px">Lås valg før hver race-helg, åpne igjen etterpå.</p>
 
-    <!-- Race results entry -->
-    <div class="section-label">Enter Race Results</div>
-    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">
-      Select a race and enter each driver's official F1 points. Only enter drivers who scored.
-      Submitting calculates everyone's handicap scores automatically.
+    <div class="section-label">Legg inn raceresultater</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">
+      Velg et race og skriv inn F1-poeng per sjåfør. Bare skriv inn for sjåfører som scoret poeng. Poengene beregnes automatisk for alle spillere.
     </p>
     <select class="race-select" id="admin-race-select" onchange="loadRaceResultsForm()">
-      <option value="">— Select race —</option>
+      <option value="">— Velg race —</option>
     </select>
     <div id="race-results-form"></div>
 
-    <!-- Driver points override -->
-    <div class="section-label">Driver Championship Points</div>
-    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">
-      These update automatically when you submit race results. Override manually if needed.
+    <div class="section-label">VM-poeng per sjåfør</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">
+      Oppdateres automatisk når du legger inn raceresultater. Kan overstyres manuelt ved behov.
     </p>
     <div id="driver-pts-form"></div>
-    <button class="btn btn-outline btn-sm" style="margin-top:12px;width:auto;padding:8px 20px" onclick="saveDriverPts()">Save Points</button>
+    <button class="btn" style="margin-top:12px;width:auto;padding:8px 20px;font-size:1rem" onclick="saveDriverPts()">LAGRE POENG</button>
 
-    <!-- Users list -->
-    <div class="section-label">Registered Users</div>
+    <div class="section-label">Registrerte spillere</div>
     <div id="admin-users-list"></div>
   </div>
 
@@ -414,27 +673,29 @@
   <nav class="bottom-nav">
     <button class="nav-item active" id="nav-team" onclick="showScreen('team')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      My Team
+      Mitt lag
     </button>
     <button class="nav-item" id="nav-drivers" onclick="showScreen('drivers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
-      Drivers
+      Sjåfører
     </button>
     <button class="nav-item" id="nav-lb" onclick="showScreen('lb')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      Standings
+      Tabell
+    </button>
+    <button class="nav-item" id="nav-points" onclick="showScreen('points')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      Poengsystem
     </button>
     <button class="nav-item" id="nav-admin" onclick="showScreen('admin')" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
       Admin
     </button>
   </nav>
 
 </div>
 
-<!-- Toast notification -->
 <div id="toast" class="toast"></div>
-
 <script src="app.js"></script>
 </body>
 </html>
