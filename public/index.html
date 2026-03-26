@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 × Handicap</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8002D;
+    --orange: #FF8000;
+    --teal: #27F4D2;
+    --bg: #080808;
+    --card: #111111;
+    --border: #1e1e1e;
+    --text: #ffffff;
+    --muted: #666666;
+    --sub: #aaaaaa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; max-width: 430px; margin: 0 auto; position: relative; overflow-x: hidden; }
+
+  /* ── HEADER ── */
+  .header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(8,8,8,0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    height: 52px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 900; letter-spacing: 0.05em; }
+  .logo span { color: var(--red); }
+  .race-pill {
+    background: #1a0000; border: 1px solid var(--red);
+    color: var(--red); font-size: 0.65rem; font-weight: 700;
+    padding: 3px 8px; border-radius: 4px; letter-spacing: 0.08em;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 430px;
+    background: rgba(10,10,10,0.97); backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    display: flex; height: 60px;
+    z-index: 50;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; cursor: pointer; transition: color 0.15s;
+    color: var(--muted); font-size: 0.65rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    border: none; background: none;
+  }
+  .nav-item.active { color: var(--orange); }
+  .nav-item svg { width: 20px; height: 20px; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; padding: 16px 16px 80px; animation: fadeIn 0.2s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── TYPOGRAPHY ── */
+  .page-title { font-family: 'Barlow Condensed', sans-serif; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
+  .page-sub { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+  .section-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.7rem; font-weight: 700;
+    color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase;
+    margin: 20px 0 10px;
+  }
+
+  /* ── CARDS ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card + .card { margin-top: 8px; }
+
+  /* ── STAT ROW ── */
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 16px 0; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 10px;
+    border-left: 3px solid var(--red);
+  }
+  .stat-card:nth-child(2) { border-left-color: var(--orange); }
+  .stat-card:nth-child(3) { border-left-color: var(--teal); }
+  .stat-val { font-family: 'Barlow Condensed', sans-serif; font-size: 1.6rem; font-weight: 900; color: var(--red); line-height: 1; }
+  .stat-card:nth-child(2) .stat-val { color: var(--orange); }
+  .stat-card:nth-child(3) .stat-val { color: var(--teal); }
+  .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+
+  /* ── DRIVER CARDS ── */
+  .driver-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .driver-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 3px solid;
+    border-radius: 10px; padding: 12px;
+  }
+  .driver-num { font-family: 'Barlow Condensed', sans-serif; font-size: 2.2rem; font-weight: 900; line-height: 1; }
+  .driver-name { font-size: 0.85rem; font-weight: 600; margin-top: 6px; }
+  .driver-team { font-size: 0.72rem; margin-top: 2px; }
+  .driver-hf { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.75rem; color: var(--sub); }
+  .driver-hf .hf { color: var(--orange); font-weight: 700; }
+
+  /* ── LEADERBOARD ── */
+  .lb-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 6px;
+  }
+  .lb-row.me { background: #1a0a00; border-color: var(--orange); }
+  .lb-rank { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 800; width: 32px; text-align: center; }
+  .lb-info { flex: 1; }
+  .lb-name { font-weight: 600; font-size: 0.9rem; }
+  .lb-name.me { color: var(--orange); }
+  .lb-picks { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .lb-score { font-family: 'Barlow Condensed', sans-serif; font-size: 1.8rem; font-weight: 900; }
+  .gold { color: #FFD700; }
+  .silver { color: #C0C0C0; }
+  .bronze { color: #CD7F32; }
+
+  /* ── RACE LOG ── */
+  .race-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 6px;
+  }
+  .race-round { font-family: 'Barlow Condensed', sans-serif; color: var(--red); font-weight: 700; font-size: 0.8rem; margin-right: 8px; }
+  .race-name { font-size: 0.85rem; color: var(--sub); }
+  .race-pts { font-family: 'Barlow Condensed', sans-serif; color: var(--orange); font-weight: 700; font-size: 1.1rem; }
+
+  /* ── PICKS GRID ── */
+  .pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pick-card {
+    background: var(--card); border: 2px solid var(--border);
+    border-radius: 10px; padding: 12px;
+    position: relative; cursor: pointer; transition: all 0.15s;
+  }
+  .pick-card.selected { border-color: var(--orange); background: rgba(255,128,0,0.08); }
+  .pick-check { position: absolute; top: 8px; right: 10px; font-size: 1rem; color: var(--orange); }
+  .pick-hf { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.72rem; color: var(--muted); }
+  .pick-hf .mult { color: var(--orange); font-weight: 700; }
+
+  /* ── NEXT RACE ── */
+  .next-race {
+    background: var(--card); border: 1px solid #2a2a2a;
+    border-radius: 10px; padding: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .next-round { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .next-name { font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 800; margin-top: 2px; }
+  .next-detail { font-size: 0.78rem; color: var(--sub); margin-top: 2px; }
+  .locked-pill {
+    background: #1a0000; border: 1px solid var(--red); color: var(--red);
+    font-size: 0.65rem; font-weight: 700; padding: 4px 8px; border-radius: 4px;
+    white-space: nowrap;
+  }
+  .open-pill {
+    background: #001a00; border: 1px solid #229971; color: #52E252;
+    font-size: 0.65rem; font-weight: 700; padding: 4px 8px; border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  /* ── SEARCH ── */
+  .search-bar {
+    background: var(--card); border: 1px solid #2a2a2a;
+    border-radius: 8px; padding: 10px 14px;
+    color: var(--text); font-family: 'Barlow', sans-serif; font-size: 0.9rem;
+    width: 100%; outline: none; margin-bottom: 12px;
+  }
+  .search-bar::placeholder { color: var(--muted); }
+
+  /* ── BTN ── */
+  .btn {
+    background: var(--red); border: none; color: #fff;
+    padding: 13px 24px; border-radius: 8px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 1rem; letter-spacing: 0.05em; cursor: pointer;
+    width: 100%; margin-top: 16px;
+    transition: opacity 0.15s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-green { background: #229971; }
+  .btn-outline { background: transparent; border: 1px solid var(--red); color: var(--red); margin-top: 8px; }
+  .btn-sm {
+    padding: 8px 16px; font-size: 0.85rem; width: auto;
+    margin-top: 0; border-radius: 6px;
+  }
+
+  /* ── LOGIN ── */
+  #auth-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 32px 24px;
+    background: radial-gradient(ellipse at 50% 0%, #1a0000 0%, var(--bg) 65%);
+  }
+  .auth-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 3rem; font-weight: 900; letter-spacing: -0.02em; text-align: center; }
+  .auth-sub { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 4px; margin-bottom: 32px; }
+  .input {
+    background: var(--card); border: 1px solid #2a2a2a;
+    border-radius: 8px; padding: 12px 14px;
+    color: var(--text); font-family: 'Barlow', sans-serif; font-size: 0.95rem;
+    width: 100%; outline: none; margin-bottom: 10px; display: block;
+    transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--red); }
+  .auth-form { width: 100%; max-width: 340px; }
+  .auth-toggle { color: var(--muted); font-size: 0.82rem; margin-top: 16px; text-align: center; }
+  .auth-toggle span { color: var(--red); cursor: pointer; }
+  .auth-tab { display: none; }
+  .auth-tab.active { display: block; }
+
+  /* ── ADMIN ── */
+  .admin-lock-btn {
+    background: #229971; border: none; color: #fff;
+    padding: 16px 24px; border-radius: 8px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 1.1rem; letter-spacing: 0.05em; cursor: pointer;
+    width: 100%; margin-bottom: 8px; transition: background 0.2s;
+  }
+  .admin-lock-btn.locked { background: var(--red); }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .admin-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .admin-table td { padding: 8px 0; border-bottom: 1px solid #161616; vertical-align: middle; }
+  .pts-input {
+    background: #1a1a1a; border: 1px solid var(--border); color: var(--text);
+    padding: 4px 8px; border-radius: 4px; width: 70px; font-size: 0.82rem;
+    font-family: 'Barlow', sans-serif;
+  }
+  .race-select {
+    background: var(--card); border: 1px solid #2a2a2a; color: var(--text);
+    padding: 10px 14px; border-radius: 8px; width: 100%; font-size: 0.9rem;
+    font-family: 'Barlow', sans-serif; outline: none; margin-bottom: 12px;
+    cursor: pointer;
+  }
+
+  /* ── SWAP BANNER ── */
+  .swap-banner {
+    background: #0a1a0a; border: 1px solid #229971; color: #52E252;
+    padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px;
+  }
+  .lock-banner {
+    background: #1a0000; border: 1px solid var(--red); color: var(--red);
+    padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; border: 1px solid #333; color: var(--text);
+    padding: 10px 20px; border-radius: 8px; font-size: 0.85rem;
+    z-index: 200; opacity: 0; transition: opacity 0.2s;
+    white-space: nowrap; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.success { border-color: #229971; color: #52E252; }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 32px 0; }
+
+  /* ── NO PICKS WARNING ── */
+  .no-picks-banner {
+    background: #0a0a1a; border: 1px solid #3671C6; color: #6699ff;
+    padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH SCREEN ══════════════════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-logo">F1<span style="color:var(--red)">×</span>HANDICAP</div>
+  <div class="auth-sub">Fantasy League · 2025</div>
+
+  <div class="auth-form">
+    <!-- Login tab -->
+    <div id="tab-login" class="auth-tab active">
+      <input class="input" id="login-username" placeholder="Username" autocomplete="username">
+      <input class="input" id="login-password" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="btn" id="btn-login">Enter</button>
+      <p class="auth-toggle">No account? <span onclick="showAuthTab('register')">Register</span></p>
+    </div>
+
+    <!-- Register tab -->
+    <div id="tab-register" class="auth-tab">
+      <input class="input" id="reg-username" placeholder="Choose username" autocomplete="username">
+      <input class="input" id="reg-password" type="password" placeholder="Choose password (min 4 chars)" autocomplete="new-password">
+      <input class="input" id="reg-confirm" type="password" placeholder="Confirm password" autocomplete="new-password">
+      <button class="btn" id="btn-register">Create Account</button>
+      <p class="auth-toggle">Already have an account? <span onclick="showAuthTab('login')">Login</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+
+  <header class="header">
+    <div class="logo">F1<span>×</span>H</div>
+    <div id="header-pill" class="race-pill" style="display:none">🏁 RACE WEEKEND</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="header-user" style="color:var(--muted);font-size:0.82rem"></div>
+      <div style="color:var(--muted);font-size:0.75rem;cursor:pointer" onclick="logout()">✕</div>
+    </div>
+  </header>
+
+  <!-- ── MY TEAM ── -->
+  <div class="screen active" id="s-team">
+    <div style="margin-bottom:4px">
+      <div class="page-title">My Team</div>
+      <div class="page-sub">Season 2025 · Handicap League</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-val" id="team-pts">—</div><div class="stat-label">Points</div></div>
+      <div class="stat-card"><div class="stat-val" id="team-rank">—</div><div class="stat-label">Rank</div></div>
+      <div class="stat-card"><div class="stat-val" id="team-swaps">—</div><div class="stat-label">Swaps</div></div>
+    </div>
+
+    <div id="no-picks-msg" class="no-picks-banner" style="display:none">
+      ⚡ You haven't picked your drivers yet — head to the Drivers tab!
+    </div>
+
+    <div class="section-label">Your Drivers</div>
+    <div class="driver-row" id="team-drivers">
+      <div class="driver-card" style="border-left-color:var(--border);color:var(--muted)">
+        <div class="driver-num" style="color:var(--muted)">?</div>
+        <div class="driver-name">No pick yet</div>
+      </div>
+      <div class="driver-card" style="border-left-color:var(--border);color:var(--muted)">
+        <div class="driver-num" style="color:var(--muted)">?</div>
+        <div class="driver-name">No pick yet</div>
+      </div>
+    </div>
+
+    <div class="section-label">Race Results</div>
+    <div id="team-races"><div class="empty">No completed races yet</div></div>
+
+    <div class="section-label">Next Race</div>
+    <div id="team-next"><div class="empty">—</div></div>
+  </div>
+
+  <!-- ── DRIVERS ── -->
+  <div class="screen" id="s-drivers">
+    <div style="margin-bottom:4px">
+      <div class="page-title">Pick Drivers</div>
+      <div class="page-sub">Choose 2 drivers for your team</div>
+    </div>
+
+    <div id="picks-lock-banner" class="lock-banner" style="display:none">
+      🔒 Picks are locked — race weekend in progress
+    </div>
+    <div id="picks-open-banner" class="swap-banner" style="display:none">
+      ✓ Picks are open — make your selection below
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:0.78rem;color:var(--muted)">Sorted by championship pts</div>
+      <div id="picks-count" style="font-family:'Barlow Condensed',sans-serif;color:var(--orange);font-weight:700;font-size:1.1rem">0/2</div>
+    </div>
+
+    <div class="pick-grid" id="drivers-grid"></div>
+    <button class="btn" id="btn-save-picks" disabled onclick="savePicks()">Save Picks</button>
+  </div>
+
+  <!-- ── LEADERBOARD ── -->
+  <div class="screen" id="s-lb">
+    <div style="margin-bottom:4px">
+      <div class="page-title">Standings</div>
+      <div class="page-sub" id="lb-sub">League standings</div>
+    </div>
+    <div style="margin-top:16px" id="lb-list"></div>
+  </div>
+
+  <!-- ── ADMIN ── -->
+  <div class="screen" id="s-admin">
+    <div style="margin-bottom:16px">
+      <div class="page-title">Admin</div>
+      <div class="page-sub">League management</div>
+    </div>
+
+    <!-- Lock toggle -->
+    <div class="section-label">Picks Control</div>
+    <button id="btn-lock" class="admin-lock-btn" onclick="toggleLock()">Loading…</button>
+    <p style="font-size:0.75rem;color:var(--muted)">Lock picks before each race weekend, unlock after.</p>
+
+    <!-- Race results entry -->
+    <div class="section-label">Enter Race Results</div>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">
+      Select a race and enter each driver's official F1 points. Only enter drivers who scored.
+      Submitting calculates everyone's handicap scores automatically.
+    </p>
+    <select class="race-select" id="admin-race-select" onchange="loadRaceResultsForm()">
+      <option value="">— Select race —</option>
+    </select>
+    <div id="race-results-form"></div>
+
+    <!-- Driver points override -->
+    <div class="section-label">Driver Championship Points</div>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">
+      These update automatically when you submit race results. Override manually if needed.
+    </p>
+    <div id="driver-pts-form"></div>
+    <button class="btn btn-outline btn-sm" style="margin-top:12px;width:auto;padding:8px 20px" onclick="saveDriverPts()">Save Points</button>
+
+    <!-- Users list -->
+    <div class="section-label">Registered Users</div>
+    <div id="admin-users-list"></div>
+  </div>
+
+  <!-- ── BOTTOM NAV ── -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-team" onclick="showScreen('team')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      My Team
+    </button>
+    <button class="nav-item" id="nav-drivers" onclick="showScreen('drivers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
+      Drivers
+    </button>
+    <button class="nav-item" id="nav-lb" onclick="showScreen('lb')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      Standings
+    </button>
+    <button class="nav-item" id="nav-admin" onclick="showScreen('admin')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      Admin
+    </button>
+  </nav>
+
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
