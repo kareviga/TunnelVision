@@ -401,8 +401,10 @@ function buildDrillHoles(
     const radial = right_cs.clone().multiplyScalar(Math.sin(angleRad))
                      .add(up_cs.clone().multiplyScalar(Math.cos(angleRad)))
 
-    // Start: 6 m behind advance along tunnel axis
-    const start = pos.clone().sub(fwd.clone().multiplyScalar(6))
+    // Start: 6 m behind advance, at the tunnel wall (radially offset by tunnel radius)
+    const start = pos.clone()
+      .sub(fwd.clone().multiplyScalar(6))
+      .add(radial.clone().multiplyScalar(TUNNEL_R))
 
     // Drill direction: forward + 8° outward
     const holeDir = fwd.clone().multiplyScalar(Math.cos(DEG8_RAD))
