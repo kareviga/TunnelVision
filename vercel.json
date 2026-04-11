@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd TunnelVision && npm install && npm run build",
+  "outputDirectory": "TunnelVision/dist",
+  "installCommand": "echo 'install handled in buildCommand'"
+}
