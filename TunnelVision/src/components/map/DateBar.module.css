@@ -99,6 +99,24 @@
   color: var(--accent);
 }
 
+.zoomTBMBtn {
+  padding: 2px 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  color: var(--text3);
+  font-size: 9px;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: all .15s;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.zoomTBMBtn:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
 .sliderSection { padding: 5px 14px 9px; }
 
 .slider {

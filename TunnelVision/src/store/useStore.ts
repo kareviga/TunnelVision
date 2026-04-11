@@ -56,6 +56,10 @@ interface AppStore {
   selectedSensor: { type: 'piezometer' | 'manometer'; id: string } | null
   setSelectedSensor: (s: { type: 'piezometer' | 'manometer'; id: string } | null) => void
 
+  // Zoom-to-TBM trigger (increment to fire)
+  zoomToTBMTick: number
+  triggerZoomToTBM: () => void
+
   // Profile view
   profParam: ProfParam
   setProfParam: (p: ProfParam) => void
@@ -107,6 +111,9 @@ export const useStore = create<AppStore>((set, get) => ({
 
   selectedSensor: null,
   setSelectedSensor: s => set({ selectedSensor: s }),
+
+  zoomToTBMTick: 0,
+  triggerZoomToTBM: () => set(s => ({ zoomToTBMTick: s.zoomToTBMTick + 1 })),
 
   profParam: 'fpi',
   setProfParam: p => set({ profParam: p }),

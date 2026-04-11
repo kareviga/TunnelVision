@@ -10,10 +10,11 @@ const THROTTLE = 60   // ms between store updates while dragging
 interface Props { data: AppData | null }
 
 export function DateBar({ data }: Props) {
-  const currentTs = useStore(s => s.currentTs)
-  const tsMin     = useStore(s => s.tsMin)
-  const tsMax     = useStore(s => s.tsMax)
-  const setTs     = useStore(s => s.setCurrentTs)
+  const currentTs      = useStore(s => s.currentTs)
+  const tsMin          = useStore(s => s.tsMin)
+  const tsMax          = useStore(s => s.tsMax)
+  const setTs          = useStore(s => s.setCurrentTs)
+  const triggerZoomToTBM = useStore(s => s.triggerZoomToTBM)
 
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed]     = useState(4)
@@ -148,6 +149,9 @@ export function DateBar({ data }: Props) {
               {s}×
             </button>
           ))}
+          <button className={styles.zoomTBMBtn} onClick={triggerZoomToTBM} title="Zoom to TBM">
+            ⊙ TBM
+          </button>
         </div>
       </div>
 

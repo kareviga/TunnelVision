@@ -55,7 +55,8 @@ interface SceneState {
 interface Props { data: AppData | null }
 
 export function ThreeDView({ data }: Props) {
-  const currentTs  = useStore(s => s.currentTs)
+  const currentTs      = useStore(s => s.currentTs)
+  const zoomToTBMTick  = useStore(s => s.zoomToTBMTick)
   const mountRef   = useRef<HTMLDivElement>(null)
   const stateRef   = useRef<SceneState | null>(null)
 
@@ -296,9 +297,25 @@ export function ThreeDView({ data }: Props) {
     // Future tube: draw from excSegs to end
     s.futTube.geometry.setDrawRange(excSegs * idxPerSeg, s.tubularSegs * idxPerSeg)
 
-    // ── Pan camera to follow TBM (gentle) ──────────────────────────────
-    // Only on initial load (when camera is at default position)
   }, [currentTs, data])
+
+  // ── Zoom to TBM ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    const s = stateRef.current
+    if (!zoomToTBMTick || !s || !data?.tbm.length) return
+    const vis  = data.tbm.filter(t => t.ts <= currentTs)
+    const last = vis.length ? vis[vis.length - 1] : data.tbm[0]
+    const idx  = findNearestIdx(s.alignPts, last.ch)
+    const pt   = s.alignPts[idx]
+    // Move orbit controls target to TBM, offset camera to a nice side view
+    s.controls.target.copy(pt.pos)
+    s.camera.position.copy(pt.pos).add(
+      pt.dir.clone().multiplyScalar(-80)
+        .add(new THREE.Vector3(0, 30, 0))
+        .add(pt.perp.clone().multiplyScalar(50))
+    )
+    s.controls.update()
+  }, [zoomToTBMTick])
 
   return (
     <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#080a0e' }}>

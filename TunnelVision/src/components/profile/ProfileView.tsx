@@ -18,12 +18,13 @@ const PROF_PARAMS: Record<ProfParam, { label: string; color: string; field: stri
 interface Props { data: AppData | null }
 
 export function ProfileView({ data }: Props) {
-  const profParam      = useStore(s => s.profParam)
-  const setProfParam   = useStore(s => s.setProfParam)
-  const profLayers     = useStore(s => s.profLayers)
-  const toggleProfLayer= useStore(s => s.toggleProfLayer)
-  const currentTs      = useStore(s => s.currentTs)
-  const channels       = useStore(s => s.channels)
+  const profParam        = useStore(s => s.profParam)
+  const setProfParam     = useStore(s => s.setProfParam)
+  const profLayers       = useStore(s => s.profLayers)
+  const toggleProfLayer  = useStore(s => s.toggleProfLayer)
+  const currentTs        = useStore(s => s.currentTs)
+  const channels         = useStore(s => s.channels)
+  const zoomToTBMTick    = useStore(s => s.zoomToTBMTick)
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const wrapRef    = useRef<HTMLDivElement>(null)
@@ -209,6 +210,18 @@ export function ProfileView({ data }: Props) {
   }, [draw])
 
   useEffect(() => { draw() }, [draw])
+
+  // Zoom to TBM
+  useEffect(() => {
+    if (!zoomToTBMTick || !data?.tbm.length) return
+    const vis  = data.tbm.filter(t => t.ts <= currentTs)
+    const last = vis.length ? vis[vis.length - 1] : data.tbm[0]
+    if (!last) return
+    const span = 800
+    const v = viewRef.current
+    viewRef.current = { ...v, chMin: last.ch - span / 2, chMax: last.ch + span / 2 }
+    draw()
+  }, [zoomToTBMTick])
 
   // Wheel zoom
   function onWheel(e: React.WheelEvent) {

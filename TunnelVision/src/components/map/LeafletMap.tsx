@@ -83,6 +83,7 @@ export function LeafletMap({ data }: Props) {
   const groutParam        = useStore(s => s.groutParam)
   const activeView        = useStore(s => s.activeView)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
+  const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const isActive          = activeView === 'map'
   const setStore          = useStore
 
@@ -509,6 +510,14 @@ export function LeafletMap({ data }: Props) {
       setTimeout(() => fitTunnel(), 100)
     }
   }, [data])
+
+  // ── Zoom to TBM ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!zoomToTBMTick || !mapRef.current || !data?.tbm.length) return
+    const vis  = data.tbm.filter(t => t.ts <= currentTs)
+    const last = vis.length ? vis[vis.length - 1] : data.tbm[0]
+    if (last) mapRef.current.flyTo([last.lat, last.lon], 16, { duration: 1 })
+  }, [zoomToTBMTick])
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
   return (
