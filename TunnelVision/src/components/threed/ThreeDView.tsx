@@ -364,12 +364,12 @@ function buildDrillHoles(
   const DEG8_RAD = 8 * Math.PI / 180
   const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
-  // Inleakage → RGB  (0=white, 5=light-blue, 50=blue, 200=dark-blue)
+  // Inleakage → RGB  (0=white, 1=light-blue, 10=blue, 50=dark-blue)
   const COLOR_STOPS: [number, [number, number, number]][] = [
-    [0,   [1,     1,     1    ]],
-    [5,   [0.678, 0.847, 0.902]],
-    [50,  [0.118, 0.392, 0.863]],
-    [200, [0.020, 0.039, 0.314]],
+    [0,  [1,     1,     1    ]],
+    [1,  [0.678, 0.847, 0.902]],
+    [10, [0.118, 0.392, 0.863]],
+    [50, [0.020, 0.039, 0.314]],
   ]
 
   function lerpColor(v: number): [number, number, number] {
