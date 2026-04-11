@@ -1,0 +1,64 @@
+.mapView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Panel toggle button (mobile only) ───────────────────────────────────── */
+.panelToggle {
+  display: none;
+}
+
+/* Backdrop only shown on mobile via JS — hide on desktop */
+.backdrop { display: none; }
+
+@media (max-width: 640px) {
+  .backdrop { display: block; }
+
+  .panelToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 600;
+    width: 36px;
+    height: 36px;
+    background: rgba(15,18,24,.92);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 16px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+
+  /* When panel is open, shift toggle to right edge of panel */
+  .panelOpen .panelToggle {
+    left: calc(252px + 10px);
+  }
+
+  /* Panel slides in from left as overlay on mobile */
+  .panelOverlay {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    z-index: 550;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.6);
+  }
+
+  .panelOverlay.open {
+    transform: translateX(0);
+  }
+}

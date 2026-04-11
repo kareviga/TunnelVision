@@ -1,0 +1,30 @@
+{
+  "name": "tunnelvision",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/three": "^0.183.1",
+    "leaflet": "^1.9.4",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.170.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.4"
+  }
+}

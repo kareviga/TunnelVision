@@ -1,0 +1,45 @@
+.wrap { position: relative; }
+
+.btn {
+  padding: 4px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn:hover { border-color: var(--accent); background: rgba(0,136,170,.1); }
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  min-width: 160px;
+  overflow: hidden;
+  z-index: 2000;
+  box-shadow: 0 8px 24px rgba(0,0,0,.6);
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-family: var(--sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .1s;
+}
+.menu button:hover { background: var(--bg3); color: var(--text); }
+
+.divider { height: 1px; background: var(--border); margin: 2px 0; }

@@ -1,0 +1,86 @@
+import { useEffect } from 'react'
+import { useAppData } from './hooks/useAppData'
+import { useStore } from './store/useStore'
+import { Header } from './components/layout/Header'
+import { ViewSwitcher } from './components/layout/ViewSwitcher'
+import { ExportMenu } from './components/layout/ExportMenu'
+import { MapView } from './components/map/MapView'
+import { DateBar } from './components/map/DateBar'
+import { ProfileView } from './components/profile/ProfileView'
+import { ThreeDView } from './components/threed/ThreeDView'
+import { SensorChart } from './components/shared/SensorChart'
+
+export function App() {
+  const { data, error } = useAppData()
+  const activeView  = useStore(s => s.activeView)
+  const setTsBounds = useStore(s => s.setTsBounds)
+
+  // Initialise time bounds once data is loaded
+  useEffect(() => {
+    if (data) setTsBounds(data.tsMin, data.tsMax)
+  }, [data])
+
+  if (error) {
+    return (
+      <div style={{
+        flex:1, display:'flex', alignItems:'center', justifyContent:'center',
+        fontFamily:'var(--mono)', color:'#f87171', fontSize:13, textAlign:'center', padding:40,
+      }}>
+        Failed to load data:<br /><span style={{color:'var(--text2)',marginTop:8,display:'block'}}>{error}</span>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Top bar: header + export */}
+      <div style={{ position:'relative' }}>
+        <Header data={data} />
+        <div style={{ position:'absolute', top:'50%', right:18, transform:'translateY(-50%)' }}>
+          <ExportMenu data={data} />
+        </div>
+      </div>
+
+      <ViewSwitcher />
+
+      {/* Loading overlay */}
+      {!data && (
+        <div style={{
+          flex:1, display:'flex', alignItems:'center', justifyContent:'center',
+          fontFamily:'var(--mono)', color:'var(--accent)', fontSize:12, letterSpacing:2,
+        }}>
+          <span style={{ animation:'pulse 1.5s infinite' }}>LOADING DATA…</span>
+        </div>
+      )}
+
+      {/* Views */}
+      {data && (
+        <>
+          <div style={{ display: activeView === 'map'     ? 'flex' : 'none', flex:1, flexDirection:'column', overflow:'hidden', minHeight:0 }}>
+            <MapView data={data} />
+          </div>
+          <div style={{ display: activeView === 'profile' ? 'flex' : 'none', flex:1, flexDirection:'column', overflow:'hidden', minHeight:0 }}>
+            <ProfileView data={data} />
+          </div>
+          <div style={{ display: activeView === '3d'      ? 'flex' : 'none', flex:1, flexDirection:'column', overflow:'hidden', minHeight:0 }}>
+            <ThreeDView data={data} />
+          </div>
+        </>
+      )}
+
+      {/* Date bar + status — always visible below all views */}
+      {data && <DateBar data={data} />}
+      <div style={{
+        height:22, background:'var(--bg2)', borderTop:'1px solid var(--border)',
+        display:'flex', alignItems:'center', padding:'0 14px', gap:18,
+        fontFamily:'var(--mono)', fontSize:10, color:'var(--text3)', flexShrink:0, zIndex:500,
+      }}>
+        <div>TUNNEL<span style={{color:'var(--accent)'}}>VISION</span></div>
+        <div>CH 175 → 11,092m · Ø7.08m TUNNEL</div>
+      </div>
+
+      {/* Sensor chart modal — rendered on top of all views */}
+      {data && <SensorChart data={data} />}
+    </>
+  )
+}

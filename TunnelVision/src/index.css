@@ -1,0 +1,69 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css');
+
+:root {
+  --bg:       #0a0c10;
+  --bg2:      #0f1218;
+  --bg3:      #141820;
+  --border:   #1e2836;
+  --border2:  #253040;
+  --accent:   #00d4ff;
+  --accent2:  #0088aa;
+  --green:    #22c55e;
+  --text:     #e2e8f0;
+  --text2:    #8899aa;
+  --text3:    #4a5a6a;
+  --mono:     'Share Tech Mono', monospace;
+  --sans:     'Barlow', sans-serif;
+  --cond:     'Barlow Condensed', sans-serif;
+  --ch-right: #f97316;
+  --ch-left:  #818cf8;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 3px; height: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Leaflet overrides ──────────────────────────────────────────────────────── */
+.leaflet-control-zoom      { display: none !important; }
+.leaflet-control-attribution {
+  background: rgba(10,12,16,.7) !important;
+  color: #4a5a6a !important;
+  font-size: 8px !important;
+  border-radius: 3px !important;
+}
+.leaflet-control-attribution a { color: #4a5a6a !important; }
+
+/* ── Tooltip ────────────────────────────────────────────────────────────────── */
+.tbm-tip {
+  background: #111;
+  color: #fff;
+  border: none;
+  font-family: var(--mono), monospace;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  box-shadow: none;
+}
+.tbm-tip::before { display: none; }
+
+/* ── Pulse animation ────────────────────────────────────────────────────────── */
+@keyframes pulse    { 0%,100% { opacity:1 } 50% { opacity:.3 } }
+@keyframes tbmp     { 0%,100% { transform:scale(1);opacity:.7 } 50% { transform:scale(1.8);opacity:0 } }

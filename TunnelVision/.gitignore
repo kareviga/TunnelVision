@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# Keep data/ at root for reference, but public/data is the runtime source
+# Optionally exclude xlsx files if they're large
+# data/*.xlsx
+

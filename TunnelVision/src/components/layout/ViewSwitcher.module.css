@@ -1,0 +1,32 @@
+.switcher {
+  display: flex;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 18px;
+  z-index: 999;
+}
+
+.tab {
+  padding: 10px 20px;
+  font-family: var(--cond);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text3);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.tab:hover { color: var(--text2); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+@media (max-width: 640px) {
+  .switcher { padding: 0; }
+  .tab      { flex: 1; padding: 9px 4px; font-size: 11px; letter-spacing: 1px; text-align: center; }
+}
