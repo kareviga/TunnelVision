@@ -49,6 +49,8 @@ interface SceneState {
   chMin: number
   chMax: number
   rafId: number
+  drillHolesMesh: THREE.LineSegments | null
+  drillHolesChainages: number[]   // chainage per hole, parallel to geometry vertex pairs
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -172,8 +174,12 @@ export function ThreeDView({ data }: Props) {
     buildTerrainStrip(scene, alignPts)
 
     // ── Drill holes ───────────────────────────────────────────────────────
+    let drillHolesMesh: THREE.LineSegments | null = null
+    let drillHolesChainages: number[] = []
     if (data.drillHoles?.length) {
-      buildDrillHoles(scene, data.drillHoles, data.alignment, e0, n0)
+      const result = buildDrillHoles(scene, data.drillHoles, data.alignment, e0, n0)
+      drillHolesMesh = result.mesh
+      drillHolesChainages = result.chainages
     }
 
     // ── TBM group ─────────────────────────────────────────────────────────
@@ -254,6 +260,7 @@ export function ThreeDView({ data }: Props) {
       excTube, futTube,
       tubularSegs, alignPts,
       chMin, chMax, rafId,
+      drillHolesMesh, drillHolesChainages,
     }
 
     return () => {
@@ -296,6 +303,12 @@ export function ThreeDView({ data }: Props) {
     s.excTube.geometry.setDrawRange(0, excSegs * idxPerSeg)
     // Future tube: draw from excSegs to end
     s.futTube.geometry.setDrawRange(excSegs * idxPerSeg, s.tubularSegs * idxPerSeg)
+
+    // ── Drill holes: show only holes at or behind TBM chainage ──────────
+    if (s.drillHolesMesh) {
+      const visibleCount = s.drillHolesChainages.filter(ch => ch <= last.ch).length
+      s.drillHolesMesh.geometry.setDrawRange(0, visibleCount * 2)
+    }
 
   }, [currentTs, data])
 
@@ -346,7 +359,7 @@ function buildDrillHoles(
   n0: number,
 ) {
   const active = drillHoles.filter(h => h.length > 0)
-  if (!active.length || alignment.length < 2) return
+  if (!active.length || alignment.length < 2) return { mesh: null, chainages: [] }
 
   const DEG8_RAD = 8 * Math.PI / 180
   const WORLD_UP = new THREE.Vector3(0, 1, 0)
@@ -374,12 +387,14 @@ function buildDrillHoles(
     return COLOR_STOPS[COLOR_STOPS.length - 1][1]
   }
 
-  // Build lookup: chainage → 3D position + direction, using alignment by ch (nearest)
-  // Drill hole `advance` = row index in alignment CSV (0,1,2...)
-  const positions: number[] = []
-  const colors:    number[] = []
+  // Sort holes by chainage so setDrawRange gives contiguous "up to TBM" slices
+  const sorted = [...active].sort((a, b) => a.advance - b.advance)
 
-  for (const hole of active) {
+  const positions:  number[] = []
+  const colors:     number[] = []
+  const chainages:  number[] = []   // one entry per hole, parallel to vertex pairs
+
+  for (const hole of sorted) {
     // Advance is an index into the alignment array; clamp to valid range
     const advIdx = Math.max(0, Math.min(Math.round(hole.advance), alignment.length - 1))
     const al     = alignment[advIdx]
@@ -416,16 +431,20 @@ function buildDrillHoles(
     const [r, g, b] = lerpColor(hole.inleakage)
     positions.push(start.x, start.y, start.z, end.x, end.y, end.z)
     colors.push(r, g, b, r, g, b)
+    chainages.push(al.ch)
   }
 
-  if (!positions.length) return
+  if (!positions.length) return { mesh: null, chainages: [] }
 
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3))
+  geo.setDrawRange(0, 0)   // start hidden; currentTs effect will set correct range
 
-  const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 })
-  scene.add(new THREE.LineSegments(geo, mat))
+  const mat  = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 })
+  const mesh = new THREE.LineSegments(geo, mat)
+  scene.add(mesh)
+  return { mesh, chainages }
 }
 
 // ── Terrain strip builder ──────────────────────────────────────────────────────
