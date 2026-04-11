@@ -19,6 +19,19 @@
   --ch-left:  #818cf8;
 }
 
+[data-theme="light"] {
+  --bg:       #f0f4f8;
+  --bg2:      #e4eaf2;
+  --bg3:      #d8e0ec;
+  --border:   #b8c8dc;
+  --border2:  #a0b4cc;
+  --accent:   #0077aa;
+  --accent2:  #005588;
+  --text:     #0f1e2e;
+  --text2:    #3a5068;
+  --text3:    #7090aa;
+}
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -50,6 +63,12 @@ body {
   border-radius: 3px !important;
 }
 .leaflet-control-attribution a { color: #4a5a6a !important; }
+
+[data-theme="light"] .leaflet-control-attribution {
+  background: rgba(240,244,248,.85) !important;
+  color: #7090aa !important;
+}
+[data-theme="light"] .leaflet-control-attribution a { color: #7090aa !important; }
 
 /* ── Tooltip ────────────────────────────────────────────────────────────────── */
 .tbm-tip {

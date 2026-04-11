@@ -60,6 +60,23 @@
   font-size: 12px;
 }
 
+.themeBtn {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text3);
+  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s, color .15s;
+  flex-shrink: 0;
+}
+.themeBtn:hover { border-color: var(--accent2); color: var(--accent); }
+
 .liveDot {
   display: inline-block;
   width: 5px;

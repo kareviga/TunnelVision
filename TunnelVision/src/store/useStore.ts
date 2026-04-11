@@ -60,6 +60,10 @@ interface AppStore {
   zoomToTBMTick: number
   triggerZoomToTBM: () => void
 
+  // Theme
+  theme: 'dark' | 'light'
+  toggleTheme: () => void
+
   // Profile view
   profParam: ProfParam
   setProfParam: (p: ProfParam) => void
@@ -114,6 +118,13 @@ export const useStore = create<AppStore>((set, get) => ({
 
   zoomToTBMTick: 0,
   triggerZoomToTBM: () => set(s => ({ zoomToTBMTick: s.zoomToTBMTick + 1 })),
+
+  theme: 'dark',
+  toggleTheme: () => set(s => {
+    const next = s.theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.setAttribute('data-theme', next)
+    return { theme: next }
+  }),
 
   profParam: 'fpi',
   setProfParam: p => set({ profParam: p }),
