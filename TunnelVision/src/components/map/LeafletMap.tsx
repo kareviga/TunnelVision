@@ -551,7 +551,7 @@ function BasemapButtons() {
     { id:'voyager', label:'Voyager' }, { id:'dark', label:'Dark' }, { id:'sat', label:'Satellite' },
   ]
   return (
-    <div style={{ position:'absolute', top:12, left:12, display:'flex', gap:4, zIndex:1000 }}>
+    <div style={{ position:'absolute', bottom:12, left:12, display:'flex', gap:4, zIndex:1000 }}>
       {opts.map(o => (
         <button
           key={o.id}
