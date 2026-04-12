@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../../store/useStore'
 import { fmtDate } from '../../utils/format'
 import type { AppData, ManometerSensor, PiezometerSensor } from '../../types'
@@ -46,6 +46,7 @@ function drawChart(
   valueLabel: string,
   valueUnit: string,
   currentTs: number,
+  viewTs: { min: number; max: number },
 ) {
   const cw = w - ML - MR
   const ch = h - MT - MB
@@ -63,11 +64,10 @@ function drawChart(
   }
 
   // ── Data ranges ────────────────────────────────────────────────────────────
-  const tsAll = valueSeries.map(p => p[0])
-  const tsMin = Math.min(...tsAll), tsMax = Math.max(...tsAll)
-  const vAll  = valueSeries.map(p => p[1])
-  const vMin  = Math.min(0, Math.min(...vAll))
-  const vMax  = Math.max(...vAll) * 1.1 || 1
+  const tsMin = viewTs.min, tsMax = viewTs.max
+  const vAll  = valueSeries.filter(p => p[0] >= tsMin && p[0] <= tsMax).map(p => p[1])
+  const vMin  = Math.min(0, vAll.length ? Math.min(...vAll) : 0)
+  const vMax  = (vAll.length ? Math.max(...vAll) : 1) * 1.1 || 1
 
   const dAll  = distSeries.map(p => p[1])
   const dMax  = Math.max(...dAll) * 1.1 || 1000
@@ -205,14 +205,20 @@ function drawChart(
   }
 }
 
+const zoomBtnStyle: React.CSSProperties = {
+  width: 24, height: 24, background: 'rgba(15,18,24,.9)', border: '1px solid #253040',
+  borderRadius: 3, color: '#7090a8', cursor: 'pointer', fontSize: 13,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace',
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 interface Props { data: AppData }
 
 export function SensorChart({ data }: Props) {
-  const selectedSensor  = useStore(s => s.selectedSensor)
+  const selectedSensor    = useStore(s => s.selectedSensor)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
-  const currentTs       = useStore(s => s.currentTs)
-  const canvasRef       = useRef<HTMLCanvasElement>(null)
+  const currentTs         = useStore(s => s.currentTs)
+  const canvasRef         = useRef<HTMLCanvasElement>(null)
 
   const sensor: ManometerSensor | PiezometerSensor | null = selectedSensor
     ? selectedSensor.type === 'manometer'
@@ -240,6 +246,18 @@ export function SensorChart({ data }: Props) {
     ? buildDistSeries(sensorTs, sensor.lat, sensor.lon, data.tbm)
     : []
 
+  // ── View state (time window) ───────────────────────────────────────────────
+  const fullTsMin = valueSeries.length ? valueSeries[0][0] : 0
+  const fullTsMax = valueSeries.length ? valueSeries[valueSeries.length - 1][0] : 1
+  const viewRef   = useRef({ min: fullTsMin, max: fullTsMax })
+  const dragRef   = useRef<{ x: number; min: number; max: number } | null>(null)
+  const touchRef  = useRef<{ x: number; min: number; max: number; dist: number } | null>(null)
+
+  // Reset view when sensor changes
+  useEffect(() => {
+    viewRef.current = { min: fullTsMin, max: fullTsMax }
+  }, [selectedSensor, fullTsMin, fullTsMax])
+
   // ── Draw ───────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -251,10 +269,106 @@ export function SensorChart({ data }: Props) {
     canvas.width  = rect.width * dpr
     canvas.height = rect.height * dpr
     ctx.scale(dpr, dpr)
-    drawChart(ctx, rect.width, rect.height, valueSeries, distSeries, valueLabel, valueUnit, currentTs)
+    drawChart(ctx, rect.width, rect.height, valueSeries, distSeries, valueLabel, valueUnit, currentTs, viewRef.current)
   }, [valueSeries, distSeries, valueLabel, valueUnit, currentTs])
 
   useEffect(() => { draw() }, [draw])
+
+  // ── Mouse wheel zoom ───────────────────────────────────────────────────────
+  function onWheel(e: React.WheelEvent) {
+    e.preventDefault()
+    const v = viewRef.current
+    const span = v.max - v.min
+    const factor = e.deltaY > 0 ? 1.2 : 0.83
+    const newSpan = Math.max(86400 * 7, Math.min(fullTsMax - fullTsMin, span * factor))
+    const mid = (v.min + v.max) / 2
+    viewRef.current = {
+      min: Math.max(fullTsMin, mid - newSpan / 2),
+      max: Math.min(fullTsMax, mid + newSpan / 2),
+    }
+    draw()
+  }
+
+  // ── Mouse drag pan ─────────────────────────────────────────────────────────
+  function onMouseDown(e: React.MouseEvent) {
+    dragRef.current = { x: e.clientX, min: viewRef.current.min, max: viewRef.current.max }
+  }
+  function onMouseMove(e: React.MouseEvent) {
+    if (!dragRef.current || !canvasRef.current) return
+    const cw = canvasRef.current.getBoundingClientRect().width - ML - MR
+    const span = dragRef.current.max - dragRef.current.min
+    const dx = ((e.clientX - dragRef.current.x) / cw) * span
+    const newMin = Math.max(fullTsMin, dragRef.current.min - dx)
+    const newMax = Math.min(fullTsMax, dragRef.current.max - dx)
+    viewRef.current = { min: newMin, max: newMax }
+    draw()
+  }
+  function onMouseUp() { dragRef.current = null }
+
+  // ── Touch pan + pinch zoom (non-passive) ──────────────────────────────────
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+
+    function touchDist(e: TouchEvent) {
+      if (e.touches.length < 2) return 0
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      return Math.sqrt(dx*dx + dy*dy)
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      e.preventDefault()
+      const v = viewRef.current
+      touchRef.current = {
+        x: e.touches.length === 1 ? e.touches[0].clientX : (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        min: v.min, max: v.max,
+        dist: touchDist(e),
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      e.preventDefault()
+      const t = touchRef.current
+      if (!t || !canvasRef.current) return
+      const cw = canvasRef.current.getBoundingClientRect().width - ML - MR
+      const span = t.max - t.min
+
+      if (e.touches.length === 1) {
+        const dx = ((e.touches[0].clientX - t.x) / cw) * span
+        viewRef.current = {
+          min: Math.max(fullTsMin, t.min - dx),
+          max: Math.min(fullTsMax, t.max - dx),
+        }
+      } else {
+        const newDist = touchDist(e)
+        if (t.dist === 0 || newDist === 0) return
+        const factor = t.dist / newDist
+        const newSpan = Math.max(86400 * 7, Math.min(fullTsMax - fullTsMin, span * factor))
+        const mid = (t.min + t.max) / 2
+        viewRef.current = {
+          min: Math.max(fullTsMin, mid - newSpan / 2),
+          max: Math.min(fullTsMax, mid + newSpan / 2),
+        }
+        touchRef.current = { ...t, dist: newDist, min: viewRef.current.min, max: viewRef.current.max }
+      }
+      draw()
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      e.preventDefault()
+      if (e.touches.length === 0) touchRef.current = null
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    el.addEventListener('touchend',   onTouchEnd,   { passive: false })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+      el.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [draw, fullTsMin, fullTsMax])
 
   // Escape to close
   useEffect(() => {
@@ -319,10 +433,31 @@ export function SensorChart({ data }: Props) {
         </div>
 
         {/* Canvas chart */}
-        <canvas
-          ref={canvasRef}
-          style={{ width: '100%', height: 300, display: 'block', borderRadius: 3 }}
-        />
+        <div style={{ position: 'relative' }}>
+          <canvas
+            ref={canvasRef}
+            style={{ width: '100%', height: 300, display: 'block', borderRadius: 3, cursor: 'grab' }}
+            onWheel={onWheel}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+          />
+          <div style={{
+            position: 'absolute', bottom: 6, right: 6,
+            display: 'flex', gap: 4,
+          }}>
+            <button onClick={() => { const span = viewRef.current.max - viewRef.current.min; const mid = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, mid - span * 0.6), max: Math.min(fullTsMax, mid + span * 0.6) }; draw() }}
+              style={zoomBtnStyle}>+</button>
+            <button onClick={() => { const span = viewRef.current.max - viewRef.current.min; const mid = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, mid - span * 0.85), max: Math.min(fullTsMax, mid + span * 0.85) }; draw() }}
+              style={zoomBtnStyle}>−</button>
+            <button onClick={() => { viewRef.current = { min: fullTsMin, max: fullTsMax }; draw() }}
+              style={zoomBtnStyle}>⊡</button>
+          </div>
+          <div style={{ position: 'absolute', bottom: 6, left: ML, fontSize: 9, fontFamily: 'monospace', color: '#3a5068', pointerEvents: 'none' }}>
+            scroll/pinch to zoom · drag to pan
+          </div>
+        </div>
       </div>
     </div>
   )
