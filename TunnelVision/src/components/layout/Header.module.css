@@ -35,10 +35,11 @@
 .right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   font-family: var(--mono);
   font-size: 10px;
   color: var(--text2);
+  flex-shrink: 0;
 }
 
 .stat {
