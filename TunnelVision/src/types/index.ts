@@ -199,6 +199,9 @@ export interface PiezometerSensor {
   id: string
   lat: number
   lon: number
+  easting: number
+  northing: number
+  elev: number                            // ground elevation (z column)
   method: string
   depth: number
   soilClass: string

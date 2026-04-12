@@ -267,6 +267,7 @@ export function useAppData() {
             }
             return {
               id: posId, lat: p.lat, lon: p.lon,
+              easting: p.x ?? 0, northing: p.y ?? 0, elev: p.z ?? 0,
               method: p.method ?? '', depth: p.depth ?? 0,
               soilClass: p.soil_classification ?? '',
               sensorName, series,

@@ -173,6 +173,11 @@ export function ThreeDView({ data }: Props) {
     // ── Terrain strip ─────────────────────────────────────────────────────
     buildTerrainStrip(scene, alignPts)
 
+    // ── Piezometers ───────────────────────────────────────────────────────
+    if (data.piezometers?.length) {
+      buildPiezometers(scene, data.piezometers, e0, n0)
+    }
+
     // ── Drill holes ───────────────────────────────────────────────────────
     let drillHolesMesh: THREE.LineSegments | null = null
     let drillHolesChainages: number[] = []
@@ -345,9 +350,42 @@ export function ThreeDView({ data }: Props) {
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: 'rgba(160,120,70,0.6)' }} />Soil</div>
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: 'rgba(90,110,140,0.6)' }} />Rock</div>
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#22c55e', opacity: 0.5 }} />Surface</div>
+        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#f472b6' }} />Piezometers</div>
       </div>
     </div>
   )
+}
+
+// ── Piezometer builder ────────────────────────────────────────────────────────
+function buildPiezometers(
+  scene: THREE.Scene,
+  piezometers: import('../../types').PiezometerSensor[],
+  e0: number,
+  n0: number,
+) {
+  const PINK  = new THREE.Color(0xf472b6)
+  const valid = piezometers.filter(p => p.easting && p.northing)
+  if (!valid.length) return
+
+  // One sphere at surface + vertical line down to probe depth per piezometer
+  for (const p of valid) {
+    const x =  p.easting  - e0
+    const z = -(p.northing - n0)
+    const yTop    = p.elev
+    const yBottom = p.elev - p.depth
+
+    // Vertical rod
+    const pts = [new THREE.Vector3(x, yTop, z), new THREE.Vector3(x, yBottom, z)]
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts)
+    scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: PINK, transparent: true, opacity: 0.7 })))
+
+    // Sphere at surface
+    const sGeo = new THREE.SphereGeometry(1.2, 8, 6)
+    const sMat = new THREE.MeshBasicMaterial({ color: PINK, transparent: true, opacity: 0.85 })
+    const sphere = new THREE.Mesh(sGeo, sMat)
+    sphere.position.set(x, yTop, z)
+    scene.add(sphere)
+  }
 }
 
 // ── Drill hole builder ────────────────────────────────────────────────────────
