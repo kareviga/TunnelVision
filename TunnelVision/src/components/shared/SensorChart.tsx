@@ -393,6 +393,18 @@ export function SensorChart({ data }: Props) {
 
   const currentDateLabel = fmtDate(currentTs)
 
+  // Distance to TBM at currentTs
+  const currentDist = (() => {
+    if (!distSeries.length) return null
+    let best: [number, number] | null = null
+    let bd = Infinity
+    for (const [ts, d] of distSeries) {
+      const dt = Math.abs(ts - currentTs)
+      if (dt < bd) { bd = dt; best = [ts, d] }
+    }
+    return best ? best[1] : null
+  })()
+
   return (
     <div
       style={{
@@ -418,7 +430,13 @@ export function SensorChart({ data }: Props) {
             </div>
             <div style={{ color: '#22c55e', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
               ▌ {currentDateLabel}
-              {valueSeries.length ? ` · ${valueSeries.length} readings` : ' · no data'}
+              {currentDist !== null && (
+                <span style={{ color: '#f59e0b', marginLeft: 8 }}>
+                  ⟷ {currentDist < 1000
+                    ? `${Math.round(currentDist)} m to TBM`
+                    : `${(currentDist / 1000).toFixed(1)} km to TBM`}
+                </span>
+              )}
             </div>
           </div>
           <button
