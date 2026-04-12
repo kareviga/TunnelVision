@@ -17,7 +17,7 @@ export function DateBar({ data }: Props) {
   const triggerZoomToTBM = useStore(s => s.triggerZoomToTBM)
 
   const [playing, setPlaying] = useState(false)
-  const [speed, setSpeed]     = useState(4)
+  const [speed, setSpeed]     = useState(1)
 
   const playRef      = useRef<ReturnType<typeof setInterval> | null>(null)
   const tsRef        = useRef(currentTs)
@@ -144,7 +144,7 @@ export function DateBar({ data }: Props) {
 
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span className={styles.speedLbl}>SPEED</span>
-          {[1, 4, 12, 52].map(s => (
+          {[1, 2].map(s => (
             <button key={s} className={`${styles.speedBtn} ${speed===s ? styles.active : ''}`} onClick={() => setSpeed(s)}>
               {s}×
             </button>

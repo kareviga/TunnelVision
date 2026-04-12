@@ -61,16 +61,8 @@ export function App() {
         </>
       )}
 
-      {/* Date bar + status — always visible below all views */}
+      {/* Date bar — always visible below all views */}
       {data && <DateBar data={data} />}
-      <div style={{
-        height:22, background:'var(--bg2)', borderTop:'1px solid var(--border)',
-        display:'flex', alignItems:'center', padding:'0 14px', gap:18,
-        fontFamily:'var(--mono)', fontSize:10, color:'var(--text3)', flexShrink:0, zIndex:500,
-      }}>
-        <div>TUNNEL<span style={{color:'var(--accent)'}}>VISION</span></div>
-        <div>CH 175 → 11,092m · Ø7.08m TUNNEL</div>
-      </div>
 
       {/* Sensor chart modal — rendered on top of all views */}
       {data && <SensorChart data={data} />}

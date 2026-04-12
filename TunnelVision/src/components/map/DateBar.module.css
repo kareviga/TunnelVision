@@ -100,21 +100,20 @@
 }
 
 .zoomTBMBtn {
-  padding: 2px 8px;
+  padding: 4px 12px;
   background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 3px;
-  color: var(--text3);
-  font-size: 9px;
+  border: 1px solid #22c55e;
+  border-radius: 4px;
+  color: #22c55e;
+  font-size: 11px;
   font-family: var(--mono);
   cursor: pointer;
   transition: all .15s;
-  margin-left: 4px;
+  margin-left: 6px;
   white-space: nowrap;
 }
 .zoomTBMBtn:hover {
-  border-color: #22c55e;
-  color: #22c55e;
+  background: rgba(34,197,94,.12);
 }
 
 .sliderSection { padding: 5px 14px 9px; }
