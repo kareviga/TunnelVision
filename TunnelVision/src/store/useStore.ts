@@ -56,6 +56,10 @@ interface AppStore {
   selectedSensor: { type: 'piezometer' | 'manometer'; id: string } | null
   setSelectedSensor: (s: { type: 'piezometer' | 'manometer'; id: string } | null) => void
 
+  // Slider dragging state — map skips expensive redraws while true
+  isSliding: boolean
+  setIsSliding: (v: boolean) => void
+
   // Zoom-to-TBM trigger (increment to fire)
   zoomToTBMTick: number
   triggerZoomToTBM: () => void
@@ -115,6 +119,9 @@ export const useStore = create<AppStore>((set, get) => ({
 
   selectedSensor: null,
   setSelectedSensor: s => set({ selectedSensor: s }),
+
+  isSliding: false,
+  setIsSliding: v => set({ isSliding: v }),
 
   zoomToTBMTick: 0,
   triggerZoomToTBM: () => set(s => ({ zoomToTBMTick: s.zoomToTBMTick + 1 })),

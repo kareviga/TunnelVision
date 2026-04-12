@@ -10,10 +10,11 @@ const THROTTLE = 60   // ms between store updates while dragging
 interface Props { data: AppData | null }
 
 export function DateBar({ data }: Props) {
-  const currentTs      = useStore(s => s.currentTs)
-  const tsMin          = useStore(s => s.tsMin)
-  const tsMax          = useStore(s => s.tsMax)
-  const setTs          = useStore(s => s.setCurrentTs)
+  const currentTs        = useStore(s => s.currentTs)
+  const tsMin            = useStore(s => s.tsMin)
+  const tsMax            = useStore(s => s.tsMax)
+  const setTs            = useStore(s => s.setCurrentTs)
+  const setIsSliding     = useStore(s => s.setIsSliding)
   const triggerZoomToTBM = useStore(s => s.triggerZoomToTBM)
 
   const [playing, setPlaying] = useState(false)
@@ -64,7 +65,7 @@ export function DateBar({ data }: Props) {
     const v   = parseInt(el.value)
     const pct = v / 100
     updateGradient(el, pct)
-    dragging.current = true
+    if (!dragging.current) { dragging.current = true; setIsSliding(true) }
     const ts  = Math.round(tsMin + (v / 10000) * (tsMax - tsMin))
     const now = Date.now()
     if (now - lastUpd.current >= THROTTLE) {
@@ -78,7 +79,7 @@ export function DateBar({ data }: Props) {
     const ts = Math.round(tsMin + (v / 10000) * (tsMax - tsMin))
     setTs(ts)
     lastUpd.current = Date.now()
-    setTimeout(() => { dragging.current = false }, 50)
+    setTimeout(() => { dragging.current = false; setIsSliding(false) }, 50)
   }
 
   // ── Day step ───────────────────────────────────────────────────────────────

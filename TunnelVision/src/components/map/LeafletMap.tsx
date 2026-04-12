@@ -84,6 +84,7 @@ export function LeafletMap({ data }: Props) {
   const activeView        = useStore(s => s.activeView)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
+  const isSliding         = useStore(s => s.isSliding)
   const isActive          = activeView === 'map'
   const setStore          = useStore
 
@@ -488,21 +489,30 @@ export function LeafletMap({ data }: Props) {
     map.fitBounds(bounds, { padding: [40, 40] })
   }
 
-  // ── Reactive redraws (skip when map tab not visible) ─────────────────────
+  // ── Reactive redraws ──────────────────────────────────────────────────────
   const pendingRedrawRef = useRef(false)
+
+  // Fast path: TBM head always updates (even while sliding)
+  useEffect(() => {
+    if (!isActive) return
+    drawTBMHead()
+  }, [isActive, drawTBMHead])
+
+  // Slow path: expensive layers — skip while slider is being dragged
   useEffect(() => {
     if (!isActive) { pendingRedrawRef.current = true; return }
+    if (isSliding) { pendingRedrawRef.current = true; return }
     pendingRedrawRef.current = false
-    drawTBMHead(); drawTunnel(); drawRings(); drawGrout(); drawBars(); drawMano(); drawPiezos()
-  }, [isActive, drawTBMHead, drawTunnel, drawRings, drawGrout, drawBars, drawMano, drawPiezos])
+    drawTunnel(); drawRings(); drawGrout(); drawBars(); drawMano(); drawPiezos()
+  }, [isActive, isSliding, drawTunnel, drawRings, drawGrout, drawBars, drawMano, drawPiezos])
 
-  // When switching back to map tab, flush any pending redraw
+  // When switching back to map tab or slider released, flush pending redraw
   useEffect(() => {
-    if (isActive && pendingRedrawRef.current) {
+    if (isActive && !isSliding && pendingRedrawRef.current) {
       pendingRedrawRef.current = false
-      drawTBMHead(); drawTunnel(); drawRings(); drawGrout(); drawBars(); drawMano(); drawPiezos()
+      drawTunnel(); drawRings(); drawGrout(); drawBars(); drawMano(); drawPiezos()
     }
-  }, [isActive])
+  }, [isActive, isSliding])
 
   // Fit tunnel once data is ready
   useEffect(() => {
