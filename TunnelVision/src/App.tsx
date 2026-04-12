@@ -3,7 +3,6 @@ import { useAppData } from './hooks/useAppData'
 import { useStore } from './store/useStore'
 import { Header } from './components/layout/Header'
 import { ViewSwitcher } from './components/layout/ViewSwitcher'
-import { ExportMenu } from './components/layout/ExportMenu'
 import { MapView } from './components/map/MapView'
 import { DateBar } from './components/map/DateBar'
 import { ProfileView } from './components/profile/ProfileView'
@@ -33,13 +32,7 @@ export function App() {
 
   return (
     <>
-      {/* Top bar: header + export */}
-      <div style={{ position:'relative' }}>
-        <Header data={data} />
-        <div style={{ position:'absolute', top:'50%', right:18, transform:'translateY(-50%)' }}>
-          <ExportMenu data={data} />
-        </div>
-      </div>
+      <Header data={data} />
 
       <ViewSwitcher />
 

@@ -10,14 +10,6 @@
   z-index: 1000;
 }
 
-@media (max-width: 640px) {
-  .header   { height: 40px; padding: 0 12px; }
-  .right    { gap: 8px; }
-  .stat     { display: none; }
-  .logoText { display: none; }
-  .logoHex  { width: 22px; height: 22px; }
-}
-
 .logo {
   display: flex;
   align-items: center;
@@ -29,6 +21,7 @@
   height: 24px;
   background: var(--accent);
   clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  flex-shrink: 0;
 }
 
 .logoText {
@@ -59,6 +52,16 @@
   font-size: 12px;
 }
 
+.liveDot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s infinite;
+  margin-right: 4px;
+}
+
 .themeBtn {
   background: none;
   border: 1px solid var(--border2);
@@ -76,12 +79,43 @@
 }
 .themeBtn:hover { border-color: var(--accent2); color: var(--accent); }
 
-.liveDot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--green);
-  animation: pulse 2s infinite;
-  margin-right: 4px;
+/* Mobile second line — hidden on desktop */
+.mobileInfo { display: none; }
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .header {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 7px 12px 6px;
+    gap: 4px;
+  }
+
+  /* First line: logo only */
+  .logo { justify-content: flex-start; }
+  .logoText { font-size: 15px; }
+  .logoHex  { width: 20px; height: 20px; }
+
+  /* Hide desktop stats */
+  .right { display: none; }
+
+  /* Second line: TBM info + theme toggle */
+  .mobileInfo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    gap: 10px;
+  }
+
+  .mobileInfoItem {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--accent);
+    font-size: 11px;
+  }
 }

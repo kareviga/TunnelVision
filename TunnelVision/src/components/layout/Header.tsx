@@ -15,10 +15,13 @@ export function Header({ data }: Props) {
 
   return (
     <header className={styles.header}>
+      {/* Logo */}
       <div className={styles.logo}>
         <div className={styles.logoHex} />
         <div className={styles.logoText}>TUNNEL<span>VISION</span></div>
       </div>
+
+      {/* Desktop stats */}
       <div className={styles.right}>
         <button className={styles.themeBtn} onClick={toggleTheme} title="Toggle light/dark mode">
           {theme === 'dark' ? '☀' : '☾'}
@@ -44,6 +47,20 @@ export function Header({ data }: Props) {
             <div>CHAINAGE</div>
           </div>
         )}
+      </div>
+
+      {/* Mobile second line */}
+      <div className={styles.mobileInfo}>
+        <div className={styles.mobileInfoItem}>
+          <span className={styles.liveDot} />
+          RING {last ? last.ring.toLocaleString() : '—'}
+        </div>
+        <div className={styles.mobileInfoItem}>
+          {currentTs ? fmtDateShort(currentTs) : '—'}
+        </div>
+        <button className={styles.themeBtn} onClick={toggleTheme} title="Toggle light/dark mode">
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
       </div>
     </header>
   )
