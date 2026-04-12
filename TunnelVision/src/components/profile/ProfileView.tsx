@@ -256,6 +256,72 @@ export function ProfileView({ data }: Props) {
 
   function onMouseUp() { isDragging.current = false }
 
+  // ── Touch handlers (pinch-zoom + pan) — must be non-passive to preventDefault ──
+  const touchStartRef = useRef<{ x: number; chMin: number; chMax: number; dist: number } | null>(null)
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+
+    function touchDist(e: TouchEvent) {
+      if (e.touches.length < 2) return 0
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      return Math.sqrt(dx*dx + dy*dy)
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      e.preventDefault()
+      const v = viewRef.current
+      if (e.touches.length === 1) {
+        touchStartRef.current = { x: e.touches[0].clientX, chMin: v.chMin, chMax: v.chMax, dist: 0 }
+      } else {
+        touchStartRef.current = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, chMin: v.chMin, chMax: v.chMax, dist: touchDist(e) }
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      e.preventDefault()
+      const ts = touchStartRef.current
+      if (!ts || !canvasRef.current) return
+      const v = viewRef.current
+      const PW = canvasRef.current.width - 64 - 24
+
+      if (e.touches.length === 1) {
+        // Pan
+        const scale = (ts.chMax - ts.chMin) / PW
+        const dx = (e.touches[0].clientX - ts.x) * scale
+        viewRef.current = { ...v, chMin: ts.chMin - dx, chMax: ts.chMax - dx }
+      } else {
+        // Pinch zoom
+        const newDist = touchDist(e)
+        if (ts.dist === 0 || newDist === 0) return
+        const factor = ts.dist / newDist
+        const span = ts.chMax - ts.chMin
+        const newSpan = Math.max(500, Math.min(11100, span * factor))
+        const mid = (ts.chMin + ts.chMax) / 2
+        viewRef.current = { ...v, chMin: mid - newSpan/2, chMax: mid + newSpan/2 }
+        // Update dist reference for smooth continuous pinch
+        touchStartRef.current = { ...ts, dist: newDist, chMin: viewRef.current.chMin, chMax: viewRef.current.chMax }
+      }
+      draw()
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      e.preventDefault()
+      if (e.touches.length === 0) touchStartRef.current = null
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    el.addEventListener('touchend',   onTouchEnd,   { passive: false })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+      el.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [draw])
+
   // Init view from data
   useEffect(() => {
     if (data?.profile.length) {
@@ -295,7 +361,7 @@ export function ProfileView({ data }: Props) {
             </div>
           ))}
         </div>
-        <div className={styles.cursorInfo}>Scroll to zoom · Drag to pan</div>
+        <div className={styles.cursorInfo}>Scroll/pinch to zoom · Drag to pan</div>
       </div>
 
       {/* Canvas */}
