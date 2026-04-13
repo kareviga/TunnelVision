@@ -187,7 +187,13 @@ export function ProfileView({ data }: Props) {
         const recent = m.series.filter(s => s[0] <= currentTs).at(-1)
         if (!recent) continue
         const pressure = recent[1]                           // bar
-        const pElev = m.elev + pressure * 10.2              // 1 bar ≈ 10.2 m water column
+        const rawPElev = m.elev + pressure * 10.2           // 1 bar ≈ 10.2 m water column
+        // Clamp to surface elevation at this chainage
+        let surfaceElev = rawPElev
+        for (const p of data.profile) {
+          if (p.ch >= m.ch) { surfaceElev = p.surfaceElev; break }
+        }
+        const pElev = Math.min(rawPElev, surfaceElev)
         const x = cx(m.ch)
         ctx.beginPath()
         ctx.arc(x, cy(pElev), 4, 0, Math.PI * 2)
