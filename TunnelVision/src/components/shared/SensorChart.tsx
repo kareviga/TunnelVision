@@ -209,22 +209,19 @@ function drawChart(
   // ── Current time vertical line ────────────────────────────────────────────
   if (currentTs >= tsMin && currentTs <= tsMax) {
     const x = cx(currentTs)
-    ctx.strokeStyle = '#22c55e'
+    ctx.strokeStyle = '#ef4444'
     ctx.lineWidth = 1.5
     ctx.setLineDash([3, 3])
     ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, MT + ch); ctx.stroke()
     ctx.setLineDash([])
 
-    let closestV: number | null = null, bestDt = Infinity
-    for (const [ts, v] of valueSeries) {
-      const dt = Math.abs(ts - currentTs)
-      if (dt < bestDt) { bestDt = dt; closestV = v }
-    }
-    if (closestV !== null && x > ML + 30 && x < ML + cw - 30) {
-      ctx.fillStyle = '#22c55e'
+    if (x > ML + 10 && x < ML + cw - 10) {
+      const d = new Date(currentTs * 1000)
+      const dateLabel = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
+      ctx.fillStyle = '#ef4444'
       ctx.font = '10px monospace'
       ctx.textAlign = x < ML + cw / 2 ? 'left' : 'right'
-      ctx.fillText(`${closestV.toFixed(1)} ${valueUnit}`, x + (x < ML + cw / 2 ? 4 : -4), MT + 14)
+      ctx.fillText(dateLabel, x + (x < ML + cw / 2 ? 4 : -4), MT + 14)
     }
   }
 
@@ -690,7 +687,7 @@ export function SensorChart({ data }: Props) {
             <div style={{ color: '#7090a8', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
               {subtitle}
             </div>
-            <div style={{ color: '#22c55e', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
+            <div style={{ color: '#ef4444', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
               ▌ {currentDateLabel}
               {currentDist !== null && (
                 <span style={{ color: '#f59e0b', marginLeft: 8 }}>
