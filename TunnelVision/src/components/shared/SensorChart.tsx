@@ -89,8 +89,8 @@ function drawChart(
   const vMin  = Math.min(0, vAll.length ? Math.min(...vAll) : 0)
   const vMax  = (vAll.length ? Math.max(...vAll) : 1) * 1.1 || 1
 
-  const dAll  = distSeries.map(p => p[1])
-  const dMax  = Math.max(...dAll) * 1.1 || 1000
+  const dAll  = distSeries.filter(p => p[0] >= tsMin && p[0] <= tsMax).map(p => p[1])
+  const dMax  = (dAll.length ? Math.max(...dAll) : 1000) * 1.1 || 1000
 
   const tsSpan = tsMax - tsMin || 1
 
