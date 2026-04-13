@@ -37,9 +37,10 @@ async function loadCSV<T>(url: string, opts?: Papa.ParseConfig): Promise<T[]> {
   })
 }
 
-// ── Wide-format piezometer CSV parser ─────────────────────────────────────────
-// File has 6 metadata rows, then "Time;SensorName[kPa] (avg);..." header on row 7,
-// then a blank row, then daily data rows.
+// ── Long-format piezometer CSV parser ─────────────────────────────────────────
+// Format: Datetime,Location name,Pressure_kPa,Source
+// Sensors split across time periods have " Geosense" / "-Geosense" suffix variants
+// which we normalise to the base name so series are merged automatically.
 
 function parsePiezoDate(s: string): number {
   // "YYYY-MM-DD HH:MM:SS" → unix seconds
@@ -49,49 +50,42 @@ function parsePiezoDate(s: string): number {
   return isNaN(ms) ? 0 : Math.floor(ms / 1000)
 }
 
-function extractSensorName(col: string): string {
-  // "Geonor - NVO - 14218:  PZ1502[kPa] (avg)" → "PZ1502"
-  const m = col.match(/:\s*(.+?)\s*\[kPa\]/)
-  return m ? m[1].trim() : ''
+function normaliseSensorName(name: string): string {
+  // "15-1 Geosense" → "15-1",  "190-Geosense" → "190"
+  return name.replace(/[\s-]*Geosense$/i, '').trim()
 }
 
 async function loadPiezoData(url: string): Promise<Map<string, Array<[number, number]>>> {
-  const res = await fetch(url)
-  if (!res.ok) return new Map()
-  const raw = await res.text()
-  const text = raw.replace(/^\uFEFF/, '')          // strip BOM
-  const lines = text.split(/\r?\n/)
-  const headerIdx = lines.findIndex(l => l.startsWith('Time;'))
-  if (headerIdx < 0) return new Map()
-
-  // Extract column names from header
-  const cols = lines[headerIdx].split(';')
-  const sensorNames = cols.slice(1).map(extractSensorName)
-
-  // Build empty series arrays
-  const seriesMap = new Map<string, Array<[number, number]>>()
-  sensorNames.forEach(n => { if (n) seriesMap.set(n, []) })
-
-  // Parse data rows (skip the blank row right after header)
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const line = lines[i].trim()
-    if (!line) continue
-    const parts = line.split(';')
-    const ts = parsePiezoDate(parts[0])
-    if (!ts) continue
-    for (let j = 1; j < parts.length && j - 1 < sensorNames.length; j++) {
-      const name = sensorNames[j - 1]
-      if (!name) continue
-      const v = parseFloat(parts[j])
-      if (isNaN(v)) continue
-      seriesMap.get(name)!.push([ts, v])
-    }
-  }
-
-  return seriesMap
+  return new Promise((resolve, reject) => {
+    Papa.parse(url, {
+      download: true,
+      header: true,
+      delimiter: ',',
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      complete: (result) => {
+        const seriesMap = new Map<string, Array<[number, number]>>()
+        for (const row of result.data as Array<Record<string, string>>) {
+          const rawName = row['Location name']?.trim()
+          const dateStr = row['Datetime']?.trim()
+          const valStr  = row['Pressure_kPa']?.trim()
+          if (!rawName || !dateStr || !valStr) continue
+          const ts  = parsePiezoDate(dateStr)
+          const val = parseFloat(valStr)
+          if (!ts || isNaN(val)) continue
+          const name = normaliseSensorName(rawName)
+          const arr  = seriesMap.get(name) ?? []
+          arr.push([ts, val])
+          seriesMap.set(name, arr)
+        }
+        resolve(seriesMap)
+      },
+      error: reject,
+    })
+  })
 }
 
-// Normalise a position ID to match data column sensor names
+// Normalise a position ID to candidate sensor names in the data file
 function normalisePiezoId(id: string): string[] {
   const s = id.trim()
   const candidates = [s]
@@ -143,7 +137,7 @@ export function useAppData() {
           loadCSV<ManometerPositionRow>(csvUrl('manometer_position.csv')),
           loadCSV<ManometerDataRow>(csvUrl('manometer_data.csv')),
           loadCSV<PiezometerPositionRow>(csvUrl('piezometer_position.csv')),
-          loadPiezoData(csvUrl('piezometer_data.csv')),
+          loadPiezoData(csvUrl('all_piezometer_data.csv')),
           loadCSV<DrillHoleRow>(csvUrl('drill_holes_data.csv')),
         ])
 
