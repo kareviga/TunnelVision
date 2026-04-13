@@ -507,8 +507,9 @@ export function SensorChart({ data }: Props) {
 
   // ── Touch pan + pinch zoom + annotation tap (non-passive) ─────────────────
   useEffect(() => {
-    const el = canvasRef.current
-    if (!el) return
+    const elRaw = canvasRef.current
+    if (!elRaw) return
+    const el: HTMLCanvasElement = elRaw
 
     function touchDist(e: TouchEvent) {
       if (e.touches.length < 2) return 0
