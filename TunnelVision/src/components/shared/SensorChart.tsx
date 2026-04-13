@@ -67,6 +67,7 @@ function drawChart(
   viewTs: { min: number; max: number },
   annotation?: Partial<PiezAnnotation>,
   hoverPt?: { ts: number; val: number; color: string } | null,
+  crosshairTs?: number | null,
 ) {
   const cw = w - ML - MR
   const ch = h - MT - MB
@@ -225,6 +226,27 @@ function drawChart(
     }
   }
 
+  // ── Crosshair (mouse hover, no annotation mode) ───────────────────────────
+  if (crosshairTs !== null && crosshairTs !== undefined) {
+    const x = cx(crosshairTs)
+    if (x >= ML && x <= ML + cw) {
+      ctx.strokeStyle = '#7090a8'
+      ctx.lineWidth = 1
+      ctx.globalAlpha = 0.6
+      ctx.setLineDash([2, 3])
+      ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, MT + ch); ctx.stroke()
+      ctx.setLineDash([])
+      ctx.globalAlpha = 1
+
+      const d = new Date(crosshairTs * 1000)
+      const label = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
+      ctx.fillStyle = '#7090a8'
+      ctx.font = '10px monospace'
+      ctx.textAlign = x < ML + cw / 2 ? 'left' : 'right'
+      ctx.fillText(label, x + (x < ML + cw / 2 ? 4 : -4), MT + ch - 4)
+    }
+  }
+
   // ── Axes ───────────────────────────────────────────────────────────────────
   ctx.strokeStyle = '#2a3a50'
   ctx.lineWidth = 1
@@ -355,7 +377,8 @@ export function SensorChart({ data }: Props) {
   const annotModeRef = useRef<AnnotMode>(null)
   annotModeRef.current = annotMode
 
-  const hoverRef = useRef<{ ts: number; val: number } | null>(null)
+  const hoverRef     = useRef<{ ts: number; val: number } | null>(null)
+  const crosshairRef = useRef<number | null>(null)
 
   const sensor: ManometerSensor | PiezometerSensor | null = selectedSensor
     ? selectedSensor.type === 'manometer'
@@ -401,11 +424,12 @@ export function SensorChart({ data }: Props) {
   useEffect(() => {
     viewRef.current = { min: fullTsMin, max: fullTsMax }
     hoverRef.current = null
+    crosshairRef.current = null
     setAnnotMode(null)
   }, [selectedSensor, fullTsMin, fullTsMax])
 
   // ── Draw ───────────────────────────────────────────────────────────────────
-  const draw = useCallback((hover?: { ts: number; val: number; color: string } | null) => {
+  const draw = useCallback((hover?: { ts: number; val: number; color: string } | null, crosshair?: number | null) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -418,10 +442,11 @@ export function SensorChart({ data }: Props) {
     const mode = annotModeRef.current
     const hoverPt = hover !== undefined ? hover
       : (hoverRef.current && mode ? { ...hoverRef.current, color: ANNOT_COLORS[mode] } : null)
+    const ch = crosshair !== undefined ? crosshair : crosshairRef.current
     drawChart(
       ctx, rect.width, rect.height,
       valueSeries, distSeries, valueLabel, valueUnit,
-      currentTs, viewRef.current, annotation, hoverPt,
+      currentTs, viewRef.current, annotation, hoverPt, ch,
     )
   }, [valueSeries, distSeries, valueLabel, valueUnit, currentTs, annotation])
 
@@ -454,16 +479,23 @@ export function SensorChart({ data }: Props) {
       }
       return
     }
+    // Crosshair when not dragging
+    if (!canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const ts = pxToTs(e.clientX, rect, viewRef.current)
+    crosshairRef.current = ts
+
     // Pan drag
-    if (!dragRef.current || !canvasRef.current) return
-    const chartW = canvasRef.current.getBoundingClientRect().width - ML - MR
-    const span = dragRef.current.max - dragRef.current.min
-    const dx = ((e.clientX - dragRef.current.x) / chartW) * span
-    viewRef.current = {
-      min: Math.max(fullTsMin, dragRef.current.min - dx),
-      max: Math.min(fullTsMax, dragRef.current.max - dx),
+    if (dragRef.current) {
+      const chartW = rect.width - ML - MR
+      const span = dragRef.current.max - dragRef.current.min
+      const dx = ((e.clientX - dragRef.current.x) / chartW) * span
+      viewRef.current = {
+        min: Math.max(fullTsMin, dragRef.current.min - dx),
+        max: Math.min(fullTsMax, dragRef.current.max - dx),
+      }
     }
-    draw(null)
+    draw(null, ts)
   }
 
   function onMouseDown(e: React.MouseEvent) {
@@ -475,10 +507,9 @@ export function SensorChart({ data }: Props) {
 
   function onMouseLeave() {
     dragRef.current = null
-    if (hoverRef.current) {
-      hoverRef.current = null
-      draw(null)
-    }
+    hoverRef.current = null
+    crosshairRef.current = null
+    draw(null, null)
   }
 
   function onCanvasClick(e: React.MouseEvent) {
