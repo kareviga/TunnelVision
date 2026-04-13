@@ -35,10 +35,12 @@ export const FPI_RAMP: [number, string][] = [
 
 export const DEFAULT_CLASSES: Record<string, DiscreteClass[]> = {
   fpi: [
-    { from: 0,  to: 10,       color: '#7f0000' }, { from: 10, to: 15, color: '#cc0000' },
-    { from: 15, to: 20,       color: '#ff6600' }, { from: 20, to: 30, color: '#ffcc00' },
-    { from: 30, to: 40,       color: '#22c55e' }, { from: 40, to: 60, color: '#3b82f6' },
-    { from: 60, to: Infinity, color: '#0a1a5c' },
+    { from: 0,  to: 10,       color: '#7f0000' },
+    { from: 10, to: 15,       color: '#dc2626' },
+    { from: 15, to: 20,       color: '#facc15' },
+    { from: 20, to: 30,       color: '#22c55e' },
+    { from: 30, to: 45,       color: '#3b82f6' },
+    { from: 45, to: Infinity, color: '#1e3a8a' },
   ],
   thrust: [
     { from: 0,     to: 4000,     color: '#1e3a5f' }, { from: 4000,  to: 7000,     color: '#2563eb' },
