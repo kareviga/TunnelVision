@@ -408,7 +408,7 @@ export function SensorChart({ data }: Props) {
   }, [selectedSensor, fullTsMin, fullTsMax])
 
   // ── Draw ───────────────────────────────────────────────────────────────────
-  const draw = useCallback((hover?: { ts: number; val: number } | null) => {
+  const draw = useCallback((hover?: { ts: number; val: number; color: string } | null) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
