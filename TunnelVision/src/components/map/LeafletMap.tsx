@@ -234,8 +234,16 @@ export function LeafletMap({ data }: Props) {
       const color = RING_TYPE_COLORS[t.ringType] ?? '#22c55e'
       L.polygon(
         [leftPts[idx], rightPts[idx], rightPts[idx+1], leftPts[idx+1]],
-        { pane:'ringsPane', color, weight:0, fillColor:color, fillOpacity:0.6 }
-      ).addTo(rl)
+        { pane:'ringsPane', color: '#000', weight: 0.5, fillColor: color, fillOpacity: 0.6 }
+      )
+        .bindTooltip(
+          `<b style="color:${color}">Ring ${t.ring}</b><br/>` +
+          `${t.ringType}<br/>` +
+          `CH ${t.ch.toFixed(0)} m<br/>` +
+          `<span style="color:#7090a8;font-size:10px">${fmtDate(t.ts)}</span>`,
+          { sticky: true, className: 'tbm-tip' }
+        )
+        .addTo(rl)
     }
     rl.addTo(map)
     layersRef.current.rings = rl
