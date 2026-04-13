@@ -85,6 +85,7 @@ export function LeafletMap({ data }: Props) {
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const isSliding         = useStore(s => s.isSliding)
+  const piezAnnotations   = useStore(s => s.piezAnnotations)
   const isActive          = activeView === 'map'
   const setStore          = useStore
 
@@ -395,9 +396,26 @@ export function LeafletMap({ data }: Props) {
     const pl = L.layerGroup()
     for (const p of data.piezometers) {
       const hasSeries = p.series.length > 0
-      const color = hasSeries ? '#f472b6' : '#8b6070'
+
+      // Base dot size + pressure-drop scaling when normal annotation is set
+      let radius = 5
+      let color = hasSeries ? '#f472b6' : '#8b6070'
+      const annot = piezAnnotations[p.id]
+      if (annot?.normalVal && hasSeries) {
+        const recent = p.series.filter(s => s[0] <= currentTs).at(-1)
+        if (recent) {
+          const drop = annot.normalVal - recent[1]
+          if (drop > 0) {
+            const dropRatio = Math.min(1, drop / Math.max(1, annot.normalVal))
+            radius = 5 + Math.round(dropRatio * 20)
+            color = dropRatio < 0.3 ? '#f472b6' : dropRatio < 0.6 ? '#f97316' : '#ef4444'
+          }
+        }
+      }
+
+      const half = radius
       const icon = L.divIcon({
-        html: `<div style="width:10px;height:10px;background:${color};border-radius:50%;border:1.5px solid #fff;transform:translate(-5px,-5px);${hasSeries ? 'cursor:pointer' : ''}"></div>`,
+        html: `<div style="width:${radius*2}px;height:${radius*2}px;background:${color};border-radius:50%;border:1.5px solid #fff;transform:translate(-${half}px,-${half}px);${hasSeries ? 'cursor:pointer' : ''}"></div>`,
         className: '',
       })
       const marker = L.marker([p.lat, p.lon], { icon, pane: 'piezosPane' })
@@ -414,7 +432,7 @@ export function LeafletMap({ data }: Props) {
     }
     pl.addTo(map)
     layersRef.current.piezos = pl
-  }, [data, layerVis.piezos, setSelectedSensor])
+  }, [data, currentTs, layerVis.piezos, setSelectedSensor, piezAnnotations])
 
   // ── Draw TBM head ─────────────────────────────────────────────────────────
   const drawTBMHead = useCallback(() => {

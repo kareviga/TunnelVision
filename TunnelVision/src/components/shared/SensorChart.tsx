@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../../store/useStore'
+import type { PiezAnnotation } from '../../store/useStore'
 import { fmtDate } from '../../utils/format'
 import type { AppData, ManometerSensor, PiezometerSensor } from '../../types'
 
@@ -14,7 +15,6 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 }
 
 // ── Build TBM distance series ─────────────────────────────────────────────────
-// Returns [[ts, distanceMetres], ...] aligned to the sensor timestamps
 function buildDistSeries(
   sensorTs: number[],
   sensorLat: number, sensorLon: number,
@@ -23,7 +23,6 @@ function buildDistSeries(
   if (!tbm.length) return []
   const result: Array<[number, number]> = []
   for (const ts of sensorTs) {
-    // Find latest TBM record at or before this timestamp
     let tbmRec = tbm[0]
     for (const t of tbm) {
       if (t.ts <= ts) tbmRec = t
@@ -38,6 +37,8 @@ function buildDistSeries(
 // ── Chart drawing ─────────────────────────────────────────────────────────────
 const ML = 62, MR = 72, MT = 28, MB = 52
 
+type AnnotMode = 'normal' | 'drop' | 'recovery' | null
+
 function drawChart(
   ctx: CanvasRenderingContext2D,
   w: number, h: number,
@@ -47,6 +48,7 @@ function drawChart(
   valueUnit: string,
   currentTs: number,
   viewTs: { min: number; max: number },
+  annotation?: Partial<PiezAnnotation>,
 ) {
   const cw = w - ML - MR
   const ch = h - MT - MB
@@ -111,6 +113,47 @@ function drawChart(
   })
   ctx.stroke()
 
+  // ── Annotation vertical lines ─────────────────────────────────────────────
+  const annotDefs: Array<{ key: keyof PiezAnnotation; valKey: keyof PiezAnnotation; color: string; label: string }> = [
+    { key: 'normalTs', valKey: 'normalVal', color: '#e2e8f0', label: 'Normal' },
+    { key: 'dropTs',   valKey: 'dropVal',   color: '#f97316', label: 'Drop'   },
+    { key: 'recoveryTs', valKey: 'recoveryVal', color: '#22c55e', label: 'Recovery' },
+  ]
+  if (annotation) {
+    for (const { key, valKey, color, label } of annotDefs) {
+      const ts = annotation[key] as number | undefined
+      const val = annotation[valKey] as number | undefined
+      if (!ts) continue
+      const x = cx(ts)
+      if (x < ML - 2 || x > ML + cw + 2) continue
+      ctx.strokeStyle = color
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 4])
+      ctx.globalAlpha = 0.85
+      ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, MT + ch); ctx.stroke()
+      ctx.setLineDash([])
+      ctx.globalAlpha = 1
+
+      // Label above chart
+      ctx.fillStyle = color
+      ctx.font = 'bold 9px monospace'
+      ctx.textAlign = x < ML + cw * 0.6 ? 'left' : 'right'
+      ctx.fillText(label, x + (x < ML + cw * 0.6 ? 3 : -3), MT + 10)
+
+      // Dot on value line
+      if (val !== undefined) {
+        const y = cy(val)
+        ctx.beginPath()
+        ctx.arc(x, y, 4, 0, Math.PI * 2)
+        ctx.fillStyle = color
+        ctx.fill()
+        ctx.strokeStyle = '#0d1117'
+        ctx.lineWidth = 1
+        ctx.stroke()
+      }
+    }
+  }
+
   // ── Current time vertical line ────────────────────────────────────────────
   if (currentTs >= tsMin && currentTs <= tsMax) {
     const x = cx(currentTs)
@@ -120,7 +163,6 @@ function drawChart(
     ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, MT + ch); ctx.stroke()
     ctx.setLineDash([])
 
-    // Label current value
     let closestV: number | null = null, bestDt = Infinity
     for (const [ts, v] of valueSeries) {
       const dt = Math.abs(ts - currentTs)
@@ -205,10 +247,39 @@ function drawChart(
   }
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const zoomBtnStyle: React.CSSProperties = {
   width: 24, height: 24, background: 'rgba(15,18,24,.9)', border: '1px solid #253040',
   borderRadius: 3, color: '#7090a8', cursor: 'pointer', fontSize: 13,
   display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace',
+}
+
+function annotBtnStyle(active: boolean, color: string): React.CSSProperties {
+  return {
+    padding: '3px 10px', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+    borderRadius: 3, border: `1px solid ${active ? color : '#253040'}`,
+    background: active ? color + '22' : 'rgba(15,18,24,.9)',
+    color: active ? color : '#7090a8',
+    letterSpacing: 0.5,
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDuration(seconds: number): string {
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  if (days > 0) return `${days}d ${hours}h`
+  return `${hours}h`
+}
+
+function nearestValue(series: Array<[number, number]>, ts: number): [number, number] | null {
+  let best: [number, number] | null = null
+  let bd = Infinity
+  for (const pt of series) {
+    const dt = Math.abs(pt[0] - ts)
+    if (dt < bd) { bd = dt; best = pt }
+  }
+  return best
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -218,7 +289,12 @@ export function SensorChart({ data }: Props) {
   const selectedSensor    = useStore(s => s.selectedSensor)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
   const currentTs         = useStore(s => s.currentTs)
+  const piezAnnotations   = useStore(s => s.piezAnnotations)
+  const setPiezAnnotation = useStore(s => s.setPiezAnnotation)
+  const clearPiezAnnotation = useStore(s => s.clearPiezAnnotation)
   const canvasRef         = useRef<HTMLCanvasElement>(null)
+
+  const [annotMode, setAnnotMode] = useState<AnnotMode>(null)
 
   const sensor: ManometerSensor | PiezometerSensor | null = selectedSensor
     ? selectedSensor.type === 'manometer'
@@ -227,6 +303,10 @@ export function SensorChart({ data }: Props) {
     : null
 
   const isMano = selectedSensor?.type === 'manometer'
+  const isPiez = selectedSensor?.type === 'piezometer'
+
+  const annotation: Partial<PiezAnnotation> | undefined =
+    isPiez && sensor ? piezAnnotations[sensor.id] : undefined
 
   // ── Build series ───────────────────────────────────────────────────────────
   let valueSeries: Array<[number, number]> = []
@@ -252,10 +332,13 @@ export function SensorChart({ data }: Props) {
   const viewRef   = useRef({ min: fullTsMin, max: fullTsMax })
   const dragRef   = useRef<{ x: number; min: number; max: number } | null>(null)
   const touchRef  = useRef<{ x: number; min: number; max: number; dist: number } | null>(null)
+  const annotModeRef = useRef<AnnotMode>(null)
+  annotModeRef.current = annotMode
 
-  // Reset view when sensor changes
+  // Reset view when sensor changes; clear annotation mode
   useEffect(() => {
     viewRef.current = { min: fullTsMin, max: fullTsMax }
+    setAnnotMode(null)
   }, [selectedSensor, fullTsMin, fullTsMax])
 
   // ── Draw ───────────────────────────────────────────────────────────────────
@@ -269,10 +352,26 @@ export function SensorChart({ data }: Props) {
     canvas.width  = rect.width * dpr
     canvas.height = rect.height * dpr
     ctx.scale(dpr, dpr)
-    drawChart(ctx, rect.width, rect.height, valueSeries, distSeries, valueLabel, valueUnit, currentTs, viewRef.current)
-  }, [valueSeries, distSeries, valueLabel, valueUnit, currentTs])
+    drawChart(ctx, rect.width, rect.height, valueSeries, distSeries, valueLabel, valueUnit, currentTs, viewRef.current, annotation)
+  }, [valueSeries, distSeries, valueLabel, valueUnit, currentTs, annotation])
 
   useEffect(() => { draw() }, [draw])
+
+  // ── Canvas click — place annotation ───────────────────────────────────────
+  function onCanvasClick(e: React.MouseEvent) {
+    const mode = annotModeRef.current
+    if (!mode || !canvasRef.current || !valueSeries.length || !sensor || isMano) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const px = e.clientX - rect.left - ML
+    const chartW = rect.width - ML - MR
+    if (px < 0 || px > chartW) return
+    const ts = viewRef.current.min + (px / chartW) * (viewRef.current.max - viewRef.current.min)
+    const pt = nearestValue(valueSeries, ts)
+    if (!pt) return
+    if (mode === 'normal')   setPiezAnnotation(sensor.id, { normalTs: pt[0],   normalVal: pt[1] })
+    if (mode === 'drop')     setPiezAnnotation(sensor.id, { dropTs: pt[0],     dropVal: pt[1] })
+    if (mode === 'recovery') setPiezAnnotation(sensor.id, { recoveryTs: pt[0], recoveryVal: pt[1] })
+  }
 
   // ── Mouse wheel zoom ───────────────────────────────────────────────────────
   function onWheel(e: React.WheelEvent) {
@@ -291,13 +390,14 @@ export function SensorChart({ data }: Props) {
 
   // ── Mouse drag pan ─────────────────────────────────────────────────────────
   function onMouseDown(e: React.MouseEvent) {
+    if (annotModeRef.current) return  // click mode, not drag
     dragRef.current = { x: e.clientX, min: viewRef.current.min, max: viewRef.current.max }
   }
   function onMouseMove(e: React.MouseEvent) {
     if (!dragRef.current || !canvasRef.current) return
-    const cw = canvasRef.current.getBoundingClientRect().width - ML - MR
+    const chartW = canvasRef.current.getBoundingClientRect().width - ML - MR
     const span = dragRef.current.max - dragRef.current.min
-    const dx = ((e.clientX - dragRef.current.x) / cw) * span
+    const dx = ((e.clientX - dragRef.current.x) / chartW) * span
     const newMin = Math.max(fullTsMin, dragRef.current.min - dx)
     const newMax = Math.min(fullTsMax, dragRef.current.max - dx)
     viewRef.current = { min: newMin, max: newMax }
@@ -331,11 +431,11 @@ export function SensorChart({ data }: Props) {
       e.preventDefault()
       const t = touchRef.current
       if (!t || !canvasRef.current) return
-      const cw = canvasRef.current.getBoundingClientRect().width - ML - MR
+      const chartW = canvasRef.current.getBoundingClientRect().width - ML - MR
       const span = t.max - t.min
 
       if (e.touches.length === 1) {
-        const dx = ((e.touches[0].clientX - t.x) / cw) * span
+        const dx = ((e.touches[0].clientX - t.x) / chartW) * span
         viewRef.current = {
           min: Math.max(fullTsMin, t.min - dx),
           max: Math.min(fullTsMax, t.max - dx),
@@ -393,7 +493,6 @@ export function SensorChart({ data }: Props) {
 
   const currentDateLabel = fmtDate(currentTs)
 
-  // Distance to TBM at currentTs
   const currentDist = (() => {
     if (!distSeries.length) return null
     let best: [number, number] | null = null
@@ -404,6 +503,17 @@ export function SensorChart({ data }: Props) {
     }
     return best ? best[1] : null
   })()
+
+  // ── Annotation summary data ────────────────────────────────────────────────
+  const hasAnnot = annotation && (annotation.normalTs || annotation.dropTs || annotation.recoveryTs)
+  const affectedPeriod = annotation?.dropTs && annotation?.recoveryTs
+    ? annotation.recoveryTs - annotation.dropTs
+    : null
+
+  const canvasStyle: React.CSSProperties = {
+    width: '100%', height: 300, display: 'block', borderRadius: 3,
+    cursor: annotMode ? 'crosshair' : 'grab',
+  }
 
   return (
     <div
@@ -418,6 +528,7 @@ export function SensorChart({ data }: Props) {
         background: '#0d1117', border: '1px solid #1e2a38',
         borderRadius: 6, padding: '16px 18px',
         width: 'min(760px, 94vw)', boxShadow: '0 8px 32px rgba(0,0,0,.7)',
+        maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -454,12 +565,13 @@ export function SensorChart({ data }: Props) {
         <div style={{ position: 'relative' }}>
           <canvas
             ref={canvasRef}
-            style={{ width: '100%', height: 300, display: 'block', borderRadius: 3, cursor: 'grab' }}
+            style={canvasStyle}
             onWheel={onWheel}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseUp}
+            onClick={onCanvasClick}
           />
           <div style={{
             position: 'absolute', bottom: 6, right: 6,
@@ -473,9 +585,92 @@ export function SensorChart({ data }: Props) {
               style={zoomBtnStyle}>⊡</button>
           </div>
           <div style={{ position: 'absolute', bottom: 6, left: ML, fontSize: 9, fontFamily: 'monospace', color: '#3a5068', pointerEvents: 'none' }}>
-            scroll/pinch to zoom · drag to pan
+            {annotMode ? 'click to place marker' : 'scroll/pinch to zoom · drag to pan'}
           </div>
         </div>
+
+        {/* Annotation toolbar — piezometers only */}
+        {isPiez && (
+          <div style={{
+            display: 'flex', gap: 6, alignItems: 'center',
+            marginTop: 10, paddingTop: 10, borderTop: '1px solid #1e2a38',
+            flexWrap: 'wrap',
+          }}>
+            <span style={{ color: '#4a6070', fontFamily: 'monospace', fontSize: 10, marginRight: 2 }}>MARK:</span>
+            <button
+              style={annotBtnStyle(annotMode === 'normal', '#e2e8f0')}
+              onClick={() => setAnnotMode(m => m === 'normal' ? null : 'normal')}
+            >⊕ Normal pressure</button>
+            <button
+              style={annotBtnStyle(annotMode === 'drop', '#f97316')}
+              onClick={() => setAnnotMode(m => m === 'drop' ? null : 'drop')}
+            >⊕ Start drop</button>
+            <button
+              style={annotBtnStyle(annotMode === 'recovery', '#22c55e')}
+              onClick={() => setAnnotMode(m => m === 'recovery' ? null : 'recovery')}
+            >⊕ Start recovery</button>
+            {hasAnnot && (
+              <button
+                style={{ ...annotBtnStyle(false, '#ef4444'), marginLeft: 'auto' }}
+                onClick={() => { if (sensor) clearPiezAnnotation(sensor.id) }}
+              >✕ Clear</button>
+            )}
+          </div>
+        )}
+
+        {/* Annotation summary table */}
+        {isPiez && hasAnnot && (
+          <div style={{
+            marginTop: 10, fontFamily: 'monospace', fontSize: 11,
+            border: '1px solid #1e2a38', borderRadius: 4, overflow: 'hidden',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#111827' }}>
+                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'left', fontSize: 10 }}>Marker</th>
+                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'left', fontSize: 10 }}>Date</th>
+                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'right', fontSize: 10 }}>Pressure (kPa)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {annotation?.normalTs && (
+                  <tr style={{ borderTop: '1px solid #1a2535' }}>
+                    <td style={{ padding: '5px 10px', color: '#e2e8f0' }}>Normal pressure</td>
+                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>{fmtDate(annotation.normalTs!)}</td>
+                    <td style={{ padding: '5px 10px', color: '#e2e8f0', textAlign: 'right' }}>{annotation.normalVal?.toFixed(1)}</td>
+                  </tr>
+                )}
+                {annotation?.dropTs && (
+                  <tr style={{ borderTop: '1px solid #1a2535' }}>
+                    <td style={{ padding: '5px 10px', color: '#f97316' }}>Start drop</td>
+                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>{fmtDate(annotation.dropTs!)}</td>
+                    <td style={{ padding: '5px 10px', color: '#f97316', textAlign: 'right' }}>{annotation.dropVal?.toFixed(1)}</td>
+                  </tr>
+                )}
+                {annotation?.recoveryTs && (
+                  <tr style={{ borderTop: '1px solid #1a2535' }}>
+                    <td style={{ padding: '5px 10px', color: '#22c55e' }}>Start recovery</td>
+                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>{fmtDate(annotation.recoveryTs!)}</td>
+                    <td style={{ padding: '5px 10px', color: '#22c55e', textAlign: 'right' }}>{annotation.recoveryVal?.toFixed(1)}</td>
+                  </tr>
+                )}
+                {affectedPeriod !== null && (
+                  <tr style={{ borderTop: '1px solid #253040', background: '#111827' }}>
+                    <td style={{ padding: '5px 10px', color: '#f59e0b' }}>Affected period</td>
+                    <td colSpan={2} style={{ padding: '5px 10px', color: '#f59e0b', textAlign: 'right' }}>
+                      {fmtDuration(affectedPeriod)}
+                      {annotation?.dropVal !== undefined && annotation?.recoveryVal !== undefined && (
+                        <span style={{ color: '#7090a8', marginLeft: 8 }}>
+                          (drop: {(annotation.dropVal! - annotation.recoveryVal!).toFixed(1)} kPa)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

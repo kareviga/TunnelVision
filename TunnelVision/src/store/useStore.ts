@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import type { ChannelState, LayerKey, ProfParam, ProfLayerKey } from '../types'
 import { getDefaultClasses, PARAMS } from '../data/params'
 
+export interface PiezAnnotation {
+  normalTs: number; normalVal: number   // baseline / normal pressure
+  dropTs: number;   dropVal: number     // start of pressure drop
+  recoveryTs: number; recoveryVal: number  // start of recovery
+}
+
 export type ViewId = 'map' | 'profile' | '3d'
 
 function makeChannel(param: string, scaleMin: number, scaleMax: number, discrete: boolean): ChannelState {
@@ -64,6 +70,11 @@ interface AppStore {
   zoomToTBMTick: number
   triggerZoomToTBM: () => void
 
+  // Piezometer annotations (stored per sensor ID)
+  piezAnnotations: Record<string, PiezAnnotation>
+  setPiezAnnotation: (id: string, patch: Partial<PiezAnnotation>) => void
+  clearPiezAnnotation: (id: string) => void
+
   // Theme
   theme: 'dark' | 'light'
   toggleTheme: () => void
@@ -125,6 +136,16 @@ export const useStore = create<AppStore>((set, get) => ({
 
   zoomToTBMTick: 0,
   triggerZoomToTBM: () => set(s => ({ zoomToTBMTick: s.zoomToTBMTick + 1 })),
+
+  piezAnnotations: {},
+  setPiezAnnotation: (id, patch) => set(s => ({
+    piezAnnotations: { ...s.piezAnnotations, [id]: { ...s.piezAnnotations[id], ...patch } as PiezAnnotation },
+  })),
+  clearPiezAnnotation: id => set(s => {
+    const next = { ...s.piezAnnotations }
+    delete next[id]
+    return { piezAnnotations: next }
+  }),
 
   theme: 'dark',
   toggleTheme: () => set(s => {
