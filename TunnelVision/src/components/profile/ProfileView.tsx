@@ -177,21 +177,25 @@ export function ProfileView({ data }: Props) {
       }
     }
 
-    // Manometers
+    // Manometers — only those behind the TBM at currentTs
     if (profLayers.mano) {
+      const visTbm = data.tbm.filter(t => t.ts <= currentTs)
+      const tbmCh  = visTbm.length ? visTbm[visTbm.length - 1].ch : -Infinity
       for (const m of data.manometers) {
-        if (m.ch < chMin-50 || m.ch > chMax+50) continue
-        const x = cx(m.ch)
-        let tunEl: number | null = null
-        for (const p of data.profile) { if (p.ch >= m.ch) { tunEl = p.tunnelElev; break } }
-        if (tunEl === null) continue
+        if (m.ch > tbmCh) continue                          // ahead of TBM
+        if (m.ch < chMin - 50 || m.ch > chMax + 50) continue
         const recent = m.series.filter(s => s[0] <= currentTs).at(-1)
-        const pressure = recent ? recent[1] : null
-        const pElev = m.elev + (pressure ?? 0) * 10  // rough: 1 bar ≈ 10m water column
-        ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 1.5
-        ctx.beginPath(); ctx.moveTo(x, cy(m.elev)); ctx.lineTo(x, cy(Math.min(pElev, m.elev + 100))); ctx.stroke()
-        ctx.fillStyle = '#fb923c'
-        ctx.beginPath(); ctx.arc(x, cy(m.elev), 3, 0, Math.PI*2); ctx.fill()
+        if (!recent) continue
+        const pressure = recent[1]                           // bar
+        const pElev = m.elev + pressure * 10.2              // 1 bar ≈ 10.2 m water column
+        const x = cx(m.ch)
+        ctx.beginPath()
+        ctx.arc(x, cy(pElev), 4, 0, Math.PI * 2)
+        ctx.fillStyle = '#60a5fa'
+        ctx.fill()
+        ctx.strokeStyle = '#1e3a5f'
+        ctx.lineWidth = 1
+        ctx.stroke()
       }
     }
 
