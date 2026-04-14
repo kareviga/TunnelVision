@@ -567,7 +567,7 @@ export function LeafletMap({ data }: Props) {
           ['⊡', fitTunnel],
         ] as [string, () => void][]).map(([label, fn], i) => (
           <button key={i} onClick={fn} style={{
-            width:30, height:30, background:'rgba(15,18,24,.92)', border:'1px solid var(--border2)',
+            width:30, height:30, background:'var(--bg3)', border:'1px solid var(--border2)',
             borderRadius:4, color:'var(--text)', fontSize: label === '⊡' ? 10 : 16,
             cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
             backdropFilter:'blur(4px)', fontFamily:'var(--mono)',

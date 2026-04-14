@@ -105,11 +105,11 @@ function renderChart(
   const ch = h - PT - PB
 
   ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = '#0d1117'
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0d1117'
   ctx.fillRect(0, 0, w, h)
 
   if (!allPts.length) {
-    ctx.fillStyle = '#3a5068'
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#3a5068'
     ctx.font = '13px monospace'
     ctx.textAlign = 'center'
     ctx.fillText('Add a series from the panel on the right', w / 2, h / 2)
@@ -150,7 +150,7 @@ function renderChart(
   }
 
   // ── Grid ──────────────────────────────────────────────────────────────────
-  ctx.strokeStyle = '#1e2a38'
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#1e2a38'
   ctx.lineWidth = 1
   const yTicks = 5
   for (let i = 0; i <= yTicks; i++) {
@@ -243,12 +243,13 @@ function renderChart(
   }
 
   // ── Axes ──────────────────────────────────────────────────────────────────
-  ctx.strokeStyle = '#2a3a50'
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#2a3a50'
   ctx.lineWidth = 1
   ctx.beginPath()
   ctx.moveTo(PL, PT); ctx.lineTo(PL, PT + ch); ctx.lineTo(PL + cw, PT + ch)
   ctx.stroke()
   if (allPts.some(s => s.cfg.visible && s.cfg.axisIdx === 1)) {
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#2a3a50'
     ctx.beginPath(); ctx.moveTo(PL + cw, PT); ctx.lineTo(PL + cw, PT + ch); ctx.stroke()
   }
 
@@ -279,7 +280,7 @@ function renderChart(
   for (let i = 0; i <= nTicks; i++) {
     const v = chMin + (chSpan / nTicks) * i
     const x = cx(v)
-    ctx.strokeStyle = '#2a3a50'; ctx.lineWidth = 1
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#2a3a50'; ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(x, PT + ch); ctx.lineTo(x, PT + ch + 4); ctx.stroke()
     ctx.fillText(`${v.toFixed(0)} m`, x, PT + ch + 16)
   }

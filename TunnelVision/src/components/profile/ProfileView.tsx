@@ -60,11 +60,13 @@ export function ProfileView({ data }: Props) {
     const cy = (el: number) => PT + offY + (eMax - el) * scaleV
 
     // Background
-    ctx.fillStyle = '#080a0e'
+    const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#080a0e'
+    const bg2Color = getComputedStyle(document.documentElement).getPropertyValue('--bg2').trim() || '#0d1117'
+    ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, W, H)
 
     // Underground fill
-    ctx.fillStyle = '#0d1117'
+    ctx.fillStyle = bg2Color
     ctx.beginPath()
     pts.forEach((p, i) => i===0 ? ctx.moveTo(cx(p.ch), cy(p.surfaceElev)) : ctx.lineTo(cx(p.ch), cy(p.surfaceElev)))
     ctx.lineTo(cx(pts[pts.length-1].ch), PT+PH)
@@ -72,7 +74,8 @@ export function ProfileView({ data }: Props) {
     ctx.closePath(); ctx.fill()
 
     // Grid
-    ctx.strokeStyle = '#151c28'; ctx.lineWidth = 0.8
+    const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#151c28'
+    ctx.strokeStyle = borderColor; ctx.lineWidth = 0.8
     const eStep = (eMax-eMin) > 150 ? 50 : 25
     for (let e = Math.ceil(eMin/eStep)*eStep; e <= eMax; e += eStep) {
       const y = cy(e); if (y < PT || y > PT+PH) continue
