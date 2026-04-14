@@ -182,44 +182,6 @@ export function ProfileView({ data }: Props) {
       }
     }
 
-    // TBM machine at current position
-    const tbmAll = data.tbm.filter(t => t.ts <= currentTs)
-    if (tbmAll.length) {
-      const last = tbmAll[tbmAll.length - 1]
-      let tunEl: number | null = null
-      for (const p of data.profile) { if (p.ch >= last.ch) { tunEl = p.tunnelElev; break } }
-      if (tunEl !== null) {
-        // Parts: [label, length-behind-face, fillColor, strokeColor]
-        const TBM_PARTS: [string, number, string, string][] = [
-          ['Cutterhead',      1.0,  '#111111', '#444444'],
-          ['Front shield',    4.9,  '#e8e8e8', '#aaaaaa'],
-          ['Drilling shield', 12.9, '#d8d8d8', '#aaaaaa'],
-          ['Gripper shield',  5.9,  '#c8c8c8', '#aaaaaa'],
-        ]
-        let curCh = last.ch
-        for (const [, len, fill, stroke] of TBM_PARTS) {
-          const x0 = cx(curCh), x1 = cx(curCh - len)
-          ctx.fillStyle = fill
-          ctx.strokeStyle = stroke
-          ctx.lineWidth = 0.8
-          ctx.beginPath()
-          ctx.rect(Math.min(x0,x1), cy(tunEl+TUNNEL_R), Math.abs(x1-x0), cy(tunEl-TUNNEL_R)-cy(tunEl+TUNNEL_R))
-          ctx.fill(); ctx.stroke()
-          curCh -= len
-        }
-        // Cutterhead front circle
-        const r = Math.abs(cy(tunEl - TUNNEL_R) - cy(tunEl + TUNNEL_R)) / 2
-        ctx.beginPath()
-        ctx.arc(cx(last.ch), cy(tunEl), r, 0, Math.PI * 2)
-        ctx.fillStyle = '#111111'; ctx.strokeStyle = '#444'; ctx.lineWidth = 1
-        ctx.fill(); ctx.stroke()
-        // Green dot at face
-        ctx.beginPath()
-        ctx.arc(cx(last.ch), cy(tunEl), 4, 0, Math.PI * 2)
-        ctx.fillStyle = '#22c55e'; ctx.fill()
-      }
-    }
-
     // Manometers — only those behind the TBM at currentTs
     if (profLayers.mano) {
       const visTbm = data.tbm.filter(t => t.ts <= currentTs)
@@ -245,6 +207,39 @@ export function ProfileView({ data }: Props) {
         ctx.strokeStyle = '#1e3a5f'
         ctx.lineWidth = 1
         ctx.stroke()
+      }
+    }
+
+    // TBM machine at current position — drawn last so it's on top of all layers
+    const tbmAll = data.tbm.filter(t => t.ts <= currentTs)
+    if (tbmAll.length) {
+      const last = tbmAll[tbmAll.length - 1]
+      let tunEl: number | null = null
+      for (const p of data.profile) { if (p.ch >= last.ch) { tunEl = p.tunnelElev; break } }
+      if (tunEl !== null) {
+        const TBM_PARTS: [string, number, string, string][] = [
+          ['Cutterhead',      1.0,  '#111111', '#444444'],
+          ['Front shield',    4.9,  '#e8e8e8', '#aaaaaa'],
+          ['Drilling shield', 12.9, '#d8d8d8', '#aaaaaa'],
+          ['Gripper shield',  5.9,  '#c8c8c8', '#aaaaaa'],
+        ]
+        let curCh = last.ch
+        for (const [, len, fill, stroke] of TBM_PARTS) {
+          const x0 = cx(curCh), x1 = cx(curCh - len)
+          ctx.fillStyle = fill
+          ctx.strokeStyle = stroke
+          ctx.lineWidth = 0.8
+          ctx.beginPath()
+          ctx.rect(Math.min(x0,x1), cy(tunEl+TUNNEL_R), Math.abs(x1-x0), cy(tunEl-TUNNEL_R)-cy(tunEl+TUNNEL_R))
+          ctx.fill(); ctx.stroke()
+          curCh -= len
+        }
+        // Cutterhead front face plate
+        const r = Math.abs(cy(tunEl - TUNNEL_R) - cy(tunEl + TUNNEL_R)) / 2
+        ctx.beginPath()
+        ctx.arc(cx(last.ch), cy(tunEl), r, 0, Math.PI * 2)
+        ctx.fillStyle = '#111111'; ctx.strokeStyle = '#444'; ctx.lineWidth = 1
+        ctx.fill(); ctx.stroke()
       }
     }
 

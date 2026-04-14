@@ -40,7 +40,6 @@ interface SceneState {
   camera:     THREE.PerspectiveCamera
   controls:   OrbitControls
   tbmGroup:   THREE.Group
-  pulseRing:  THREE.Mesh
   coneLight:  THREE.PointLight
   excTube:    THREE.Mesh
   futTube:    THREE.Mesh
@@ -192,7 +191,9 @@ export function ThreeDView({ data }: Props) {
     let yOffset = 0
 
     for (const seg of TBM_PARTS) {
-      const geo = new THREE.CylinderGeometry(TUNNEL_R - 0.05, TUNNEL_R - 0.05, seg.len, RADIAL_SEGS, 1, true)
+      // Cutterhead: closed cylinder (solid plate); shields: open tube
+      const isCutter = seg.name === 'Cutterhead'
+      const geo = new THREE.CylinderGeometry(TUNNEL_R - 0.05, TUNNEL_R - 0.05, seg.len, RADIAL_SEGS, 1, !isCutter)
       const mat = new THREE.MeshPhongMaterial({ color: seg.hex, shininess: 80, side: THREE.DoubleSide })
       const mesh = new THREE.Mesh(geo, mat)
       // CylinderGeometry along Y; offset so cutter face is at y=0
@@ -200,20 +201,6 @@ export function ThreeDView({ data }: Props) {
       yOffset += seg.len
       tbmGroup.add(mesh)
     }
-
-    // Cutter face disc
-    const faceGeo = new THREE.CircleGeometry(TUNNEL_R - 0.05, RADIAL_SEGS)
-    const faceMat = new THREE.MeshPhongMaterial({ color: 0x333333, side: THREE.DoubleSide })
-    const faceMesh = new THREE.Mesh(faceGeo, faceMat)
-    // CircleGeometry is in XZ plane (normal = +Y); it sits at y=0 already
-    tbmGroup.add(faceMesh)
-
-    // Pulsing green ring at cutter face
-    const pulseRing = new THREE.Mesh(
-      new THREE.TorusGeometry(TUNNEL_R, 0.25, 8, RADIAL_SEGS),
-      new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.9 })
-    )
-    tbmGroup.add(pulseRing)
 
     // Back cap
     const backGeo = new THREE.CircleGeometry(TUNNEL_R - 0.05, RADIAL_SEGS)
@@ -236,16 +223,9 @@ export function ThreeDView({ data }: Props) {
     scene.add(gridHelper)
 
     // ── Render loop ───────────────────────────────────────────────────────
-    let frame = 0
     function animate() {
       const id = requestAnimationFrame(animate)
       if (stateRef.current) stateRef.current.rafId = id
-      frame++
-      const t = frame * 0.05
-      // Pulse the ring
-      const s = 1 + 0.12 * Math.sin(t)
-      pulseRing.scale.setScalar(s);
-      (pulseRing.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.4 * Math.abs(Math.sin(t))
       controls.update()
       renderer.render(scene, camera)
     }
@@ -261,7 +241,7 @@ export function ThreeDView({ data }: Props) {
 
     stateRef.current = {
       renderer, scene, camera, controls,
-      tbmGroup, pulseRing, coneLight,
+      tbmGroup, coneLight,
       excTube, futTube,
       tubularSegs, alignPts,
       chMin, chMax, rafId,
@@ -346,7 +326,7 @@ export function ThreeDView({ data }: Props) {
       </div>
       <div className={styles.legend}>
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#00d4ff' }} />Tunnel</div>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#22c55e' }} />TBM front</div>
+        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#cccccc' }} />TBM</div>
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: 'rgba(160,120,70,0.6)' }} />Soil</div>
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: 'rgba(90,110,140,0.6)' }} />Rock</div>
         <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#22c55e', opacity: 0.5 }} />Surface</div>
