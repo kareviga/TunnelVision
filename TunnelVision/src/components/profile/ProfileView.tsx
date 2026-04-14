@@ -1,12 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { formatCH } from '../../utils/format'
-import { valToColor, groutValToRGB } from '../../utils/color'
-import { PARAMS } from '../../data/params'
+import { valToColor, groutAttrColor } from '../../utils/color'
+
+import { TUNNEL_R } from '../../utils/geo'
 import type { AppData, ProfParam } from '../../types'
 import styles from './ProfileView.module.css'
-
-const GROUT_MAX = 160
 
 const PROF_PARAMS: Record<ProfParam, { label: string; color: string; field: string; unit: string; max: number }> = {
   fpi:    { label:'FPI',          color:'#f59e0b', field:'fpi',    unit:'kN/c', max:77 },
@@ -139,41 +138,82 @@ export function ProfileView({ data }: Props) {
 
     // Grout screens
     if (profLayers.grout) {
+      const fanRad = 8 * Math.PI / 180
       const vg = data.grout.filter(g => g.ts <= currentTs && g.ch >= chMin-50 && g.ch <= chMax+50)
       for (const g of vg) {
         let tunEl: number | null = null
         for (const p of data.profile) { if (p.ch >= g.ch) { tunEl = p.tunnelElev; break } }
         if (tunEl === null) continue
+        const isDrillingOnly = (!g.injVol || g.injVol <= 0) && (!g.cement || g.cement <= 0)
+        const fillColor = groutAttrColor(isDrillingOnly ? 0 : g.inleakage)
         const x0 = cx(g.ch - 6), x1 = cx(g.ch - 6 + g.screenLen)
-        const sHW = 3.54, eHW = 3.54 + g.screenLen * Math.tan(8 * Math.PI / 180)
-        const [r, gr, b] = groutValToRGB(g.inleakage, GROUT_MAX)
-        ctx.fillStyle = `rgba(${r},${gr},${b},0.5)`; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.4
+        const sHW = TUNNEL_R, eHW = TUNNEL_R + g.screenLen * Math.tan(fanRad)
+        ctx.fillStyle = fillColor
+        ctx.strokeStyle = isDrillingOnly ? '#ef4444' : '#555'
+        ctx.lineWidth   = isDrillingOnly ? 1.5 : 0.5
+        if (isDrillingOnly) ctx.setLineDash([4, 3])
         ctx.beginPath()
         ctx.moveTo(x0, cy(tunEl+sHW)); ctx.lineTo(x1, cy(tunEl+eHW))
         ctx.lineTo(x1, cy(tunEl-eHW)); ctx.lineTo(x0, cy(tunEl-sHW))
         ctx.closePath(); ctx.fill(); ctx.stroke()
+        ctx.setLineDash([])
       }
     }
 
     // TBM coloured band
     const visTBM = data.tbm.filter(t => t.ts <= currentTs && t.ch >= chMin-50 && t.ch <= chMax+50)
     const pcfg = PROF_PARAMS[profParam]
-    const paramDef = PARAMS[profParam]
-    const chState = channels.right  // use right channel state for coloring
+    const chState = channels.right
     if (visTBM.length > 1) {
       for (let i = 0; i < visTBM.length - 1; i++) {
         const t = visTBM[i]
         const val = (t as unknown as Record<string,number>)[pcfg.field]
         if (!val || val <= 0) continue
         const color = valToColor(val, chState)
-        const tEl = t.lat  // tunnel elev from profile
         let tunEl: number | null = null
         for (const p of data.profile) { if (p.ch >= t.ch) { tunEl = p.tunnelElev; break } }
         if (tunEl === null) continue
-        const r = 3.54
         const x0 = cx(t.ch), x1 = cx(visTBM[i+1].ch)
         ctx.fillStyle = color
-        ctx.fillRect(x0, cy(tunEl+r), x1-x0, cy(tunEl-r)-cy(tunEl+r))
+        ctx.fillRect(x0, cy(tunEl+TUNNEL_R), x1-x0, cy(tunEl-TUNNEL_R)-cy(tunEl+TUNNEL_R))
+      }
+    }
+
+    // TBM machine at current position
+    const tbmAll = data.tbm.filter(t => t.ts <= currentTs)
+    if (tbmAll.length) {
+      const last = tbmAll[tbmAll.length - 1]
+      let tunEl: number | null = null
+      for (const p of data.profile) { if (p.ch >= last.ch) { tunEl = p.tunnelElev; break } }
+      if (tunEl !== null) {
+        // Parts: [label, length-behind-face, fillColor, strokeColor]
+        const TBM_PARTS: [string, number, string, string][] = [
+          ['Cutterhead',      1.0,  '#111111', '#444444'],
+          ['Front shield',    4.9,  '#e8e8e8', '#aaaaaa'],
+          ['Drilling shield', 12.9, '#d8d8d8', '#aaaaaa'],
+          ['Gripper shield',  5.9,  '#c8c8c8', '#aaaaaa'],
+        ]
+        let curCh = last.ch
+        for (const [, len, fill, stroke] of TBM_PARTS) {
+          const x0 = cx(curCh), x1 = cx(curCh - len)
+          ctx.fillStyle = fill
+          ctx.strokeStyle = stroke
+          ctx.lineWidth = 0.8
+          ctx.beginPath()
+          ctx.rect(Math.min(x0,x1), cy(tunEl+TUNNEL_R), Math.abs(x1-x0), cy(tunEl-TUNNEL_R)-cy(tunEl+TUNNEL_R))
+          ctx.fill(); ctx.stroke()
+          curCh -= len
+        }
+        // Cutterhead front circle
+        const r = Math.abs(cy(tunEl - TUNNEL_R) - cy(tunEl + TUNNEL_R)) / 2
+        ctx.beginPath()
+        ctx.arc(cx(last.ch), cy(tunEl), r, 0, Math.PI * 2)
+        ctx.fillStyle = '#111111'; ctx.strokeStyle = '#444'; ctx.lineWidth = 1
+        ctx.fill(); ctx.stroke()
+        // Green dot at face
+        ctx.beginPath()
+        ctx.arc(cx(last.ch), cy(tunEl), 4, 0, Math.PI * 2)
+        ctx.fillStyle = '#22c55e'; ctx.fill()
       }
     }
 

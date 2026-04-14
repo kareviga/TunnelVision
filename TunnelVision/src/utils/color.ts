@@ -62,3 +62,27 @@ export function groutValToRGB(val: number, max: number): [number, number, number
   const m = color.match(/\d+/g)!
   return [parseInt(m[0]), parseInt(m[1]), parseInt(m[2])]
 }
+
+// White → light blue → blue → dark blue (matches map view grout coloring)
+const GROUT_COLOR_STOPS: [number, [number, number, number]][] = [
+  [0,   [255, 255, 255]],
+  [5,   [173, 216, 230]],
+  [50,  [30,  100, 220]],
+  [200, [5,   10,  80 ]],
+]
+export function groutAttrColor(val: number): string {
+  if (!val || val <= 0) return '#ffffff'
+  const stops = GROUT_COLOR_STOPS
+  if (val >= stops[stops.length - 1][0]) {
+    const [r, g, b] = stops[stops.length - 1][1]
+    return `rgb(${r},${g},${b})`
+  }
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [v0, c0] = stops[i], [v1, c1] = stops[i + 1]
+    if (val <= v1) {
+      const t = (val - v0) / (v1 - v0)
+      return `rgb(${Math.round(c0[0]+(c1[0]-c0[0])*t)},${Math.round(c0[1]+(c1[1]-c0[1])*t)},${Math.round(c0[2]+(c1[2]-c0[2])*t)})`
+    }
+  }
+  return '#ffffff'
+}
