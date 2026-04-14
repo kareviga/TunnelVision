@@ -7,6 +7,7 @@ import { MapView } from './components/map/MapView'
 import { DateBar } from './components/map/DateBar'
 import { ProfileView } from './components/profile/ProfileView'
 import { ThreeDView } from './components/threed/ThreeDView'
+import { GraphsView } from './components/graphs/GraphsView'
 import { SensorChart } from './components/shared/SensorChart'
 
 export function App() {
@@ -57,6 +58,9 @@ export function App() {
           </div>
           <div style={{ display: activeView === '3d'      ? 'flex' : 'none', flex:1, flexDirection:'column', overflow:'hidden', minHeight:0 }}>
             <ThreeDView data={data} />
+          </div>
+          <div style={{ display: activeView === 'graphs'  ? 'flex' : 'none', flex:1, flexDirection:'column', overflow:'hidden', minHeight:0 }}>
+            <GraphsView data={data} />
           </div>
         </>
       )}

@@ -5,6 +5,7 @@ const TABS: { id: ViewId; label: string }[] = [
   { id: 'map',     label: 'Map View' },
   { id: 'profile', label: 'Profile View' },
   { id: '3d',      label: '3D View' },
+  { id: 'graphs',  label: 'Graphs' },
 ]
 
 export function ViewSwitcher() {
