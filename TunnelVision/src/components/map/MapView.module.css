@@ -34,7 +34,7 @@
     z-index: 600;
     width: 36px;
     height: 36px;
-    background: rgba(15,18,24,.92);
+    background: var(--bg3);
     border: 1px solid var(--border2);
     border-radius: 6px;
     color: var(--text2);

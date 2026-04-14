@@ -5,14 +5,14 @@ import { discreteRampCSS, rampCSS, FPI_RAMP, RAMP } from '../../utils/color'
 import type { AppData, LayerKey, DiscreteClass } from '../../types'
 import styles from './MapPanel.module.css'
 
-const LAYER_META: Record<LayerKey, { label: string; color: string }> = {
-  piezos:  { label: 'Piezometers',        color: '#f472b6' },
-  mano:    { label: 'Manometers',         color: '#fb923c' },
-  tunnel:  { label: 'Tunnel body',        color: 'rgba(0,212,255,.5)' },
-  center:  { label: 'Centreline',         color: '#00d4ff' },
-  rings:   { label: 'Ring types',         color: 'linear-gradient(to right,#22c55e,#eab308,#111,#ef4444)' },
-  grout:   { label: 'Pre-grouting screens', color: '#818cf8' },
-  markers: { label: 'CH markers',         color: '#888' },
+const LAYER_META: Record<LayerKey, { label: string; color: string; hasAttr?: boolean; hasColor?: boolean }> = {
+  piezos:  { label: 'Piezometers',          color: '#f472b6' },
+  mano:    { label: 'Manometers',           color: '#fb923c' },
+  tunnel:  { label: 'Tunnel body',          color: 'rgba(0,212,255,.5)', hasColor: true },
+  center:  { label: 'Centreline',           color: '#00d4ff', hasColor: true },
+  rings:   { label: 'Ring types',           color: 'linear-gradient(to right,#22c55e,#eab308,#111,#ef4444)' },
+  grout:   { label: 'Drilling & grouting',  color: '#818cf8', hasAttr: true },
+  markers: { label: 'CH markers',           color: '#888' },
 }
 
 interface Props { data: AppData | null }
@@ -33,41 +33,32 @@ function Section({ title, sub, children, defaultOpen = true }: {
 }
 
 export function MapPanel({ data: _data }: Props) {
-  const channels      = useStore(s => s.channels)
-  const updateChannel = useStore(s => s.updateChannel)
-  const layerVis      = useStore(s => s.layerVis)
-  const toggleLayer   = useStore(s => s.toggleLayer)
-  const layerOrder    = useStore(s => s.layerOrder)
-  const setLayerOrder = useStore(s => s.setLayerOrder)
-  const barOpacity    = useStore(s => s.barOpacity)
-  const setBarOpacity = useStore(s => s.setBarOpacity)
-  const groutParam    = useStore(s => s.groutParam)
-  const setGroutParam = useStore(s => s.setGroutParam)
+  const channels        = useStore(s => s.channels)
+  const updateChannel   = useStore(s => s.updateChannel)
+  const layerVis        = useStore(s => s.layerVis)
+  const toggleLayer     = useStore(s => s.toggleLayer)
+  const layerOrder      = useStore(s => s.layerOrder)
+  const setLayerOrder   = useStore(s => s.setLayerOrder)
+  const layerStyles     = useStore(s => s.layerStyles)
+  const updateLayerStyle = useStore(s => s.updateLayerStyle)
+  const barOpacity      = useStore(s => s.barOpacity)
+  const setBarOpacity   = useStore(s => s.setBarOpacity)
 
-  // Which channel card has the scale editor open
   const [scaleOpen, setScaleOpen] = useState<'right' | 'left' | null>(null)
+  const [layerEdit, setLayerEdit] = useState<LayerKey | null>(null)
 
-  // ── Drag-and-drop state ───────────────────────────────────────────────────
   const dragKey   = useRef<LayerKey | null>(null)
   const dragOver  = useRef<LayerKey | null>(null)
 
-  function onDragStart(key: LayerKey) {
-    dragKey.current = key
-  }
-  function onDragEnter(key: LayerKey) {
-    dragOver.current = key
-  }
+  function onDragStart(key: LayerKey) { dragKey.current = key }
+  function onDragEnter(key: LayerKey) { dragOver.current = key }
   function onDragEnd() {
-    const from = dragKey.current
-    const to   = dragOver.current
-    dragKey.current  = null
-    dragOver.current = null
+    const from = dragKey.current, to = dragOver.current
+    dragKey.current = null; dragOver.current = null
     if (!from || !to || from === to) return
     const next = [...layerOrder]
-    const fi = next.indexOf(from)
-    const ti = next.indexOf(to)
-    next.splice(fi, 1)
-    next.splice(ti, 0, from)
+    const fi = next.indexOf(from), ti = next.indexOf(to)
+    next.splice(fi, 1); next.splice(ti, 0, from)
     setLayerOrder(next as LayerKey[])
   }
 
@@ -86,28 +77,18 @@ export function MapPanel({ data: _data }: Props) {
 
     return (
       <div className={`${styles.channelCard} ${styles[side]}`} key={side}>
-        {/* Header row: title + vis toggle */}
         <div className={styles.chHeader}>
-          <div className={styles.chTitle}>
-            {side === 'right' ? '▶ Right' : '◀ Left'}
-          </div>
-          <div
-            className={`${styles.visToggle} ${ch.visible ? styles.on : ''}`}
-            onClick={() => updateChannel(side, { visible: !ch.visible })}
-          />
+          <div className={styles.chTitle}>{side === 'right' ? '▶ Right' : '◀ Left'}</div>
+          <div className={`${styles.visToggle} ${ch.visible ? styles.on : ''}`}
+            onClick={() => updateChannel(side, { visible: !ch.visible })} />
         </div>
-
-        {/* Group tabs */}
         <div className={styles.groupTabs}>
           {(['tbm','xrf'] as const).map(g => (
-            <div key={g}
-              className={`${styles.gtab} ${ch.group === g ? styles.active : ''}`}
+            <div key={g} className={`${styles.gtab} ${ch.group === g ? styles.active : ''}`}
               onClick={() => updateChannel(side, { group: g, param: g === 'tbm' ? TBM_PARAMS[0] : XRF_PARAMS[0] })}
             >{g.toUpperCase()}</div>
           ))}
         </div>
-
-        {/* Param select */}
         <select className={styles.paramSelect} value={ch.param}
           onChange={e => updateChannel(side, { param: e.target.value })}>
           {paramKeys.map(k => {
@@ -115,36 +96,21 @@ export function MapPanel({ data: _data }: Props) {
             return <option key={k} value={k}>{p.label}{p.unit ? ` (${p.unit})` : ''}</option>
           })}
         </select>
-
-        {/* Colour scale — click to expand editor */}
-        <button
-          className={`${styles.rampBtn} ${editorOpen ? styles.rampBtnOpen : ''}`}
-          onClick={() => setScaleOpen(editorOpen ? null : side)}
-          title="Click to edit scale"
-        >
+        <button className={`${styles.rampBtn} ${editorOpen ? styles.rampBtnOpen : ''}`}
+          onClick={() => setScaleOpen(editorOpen ? null : side)} title="Click to edit scale">
           <div className={styles.rampPreview} style={{ background: rampPreviewStyle(side) }} />
           <span className={styles.rampChevron}>{editorOpen ? '▴' : '▾'}</span>
         </button>
-
-        {/* Scale editor — shown only when ramp is clicked */}
         {editorOpen && (
           <div className={styles.scaleEditor}>
-            {/* Mode toggle */}
             <div className={styles.scaleEditorRow}>
               <span className={styles.scaleLbl}>Mode</span>
-              <button
-                className={`${styles.modeBtn} ${ch.discrete ? styles.on : ''}`}
+              <button className={`${styles.modeBtn} ${ch.discrete ? styles.on : ''}`}
                 onClick={() => {
                   const next = !ch.discrete
-                  updateChannel(side, {
-                    discrete: next,
-                    classes: next && (!ch.classes?.length) ? getDefaultClasses(ch.param) : ch.classes,
-                  })
-                }}
-              >DISCRETE</button>
+                  updateChannel(side, { discrete: next, classes: next && (!ch.classes?.length) ? getDefaultClasses(ch.param) : ch.classes })
+                }}>DISCRETE</button>
             </div>
-
-            {/* Continuous min/max */}
             {!ch.discrete && (
               <div className={styles.scaleRow}>
                 <span className={styles.scaleLbl}>Min</span>
@@ -154,68 +120,39 @@ export function MapPanel({ data: _data }: Props) {
                 <input className={styles.scaleInp} type="number" step="any" value={ch.scaleMax}
                   onChange={e => updateChannel(side, { scaleMax: parseFloat(e.target.value) || 1 })} />
                 <button className={styles.autoBtn}
-                  onClick={() => updateChannel(side, { scaleMin: def.min, scaleMax: def.max, inverted: false })}>
-                  AUTO
-                </button>
+                  onClick={() => updateChannel(side, { scaleMin: def.min, scaleMax: def.max, inverted: false })}>AUTO</button>
               </div>
             )}
-
-            {/* Discrete class editor */}
             {ch.discrete && (
               <div className={styles.classEditor}>
                 <div className={styles.classHeader}>
-                  <span style={{width:44}}>From</span>
-                  <span style={{width:44}}>To</span>
-                  <span style={{width:22}}>Col</span>
+                  <span style={{width:44}}>From</span><span style={{width:44}}>To</span><span style={{width:22}}>Col</span>
                 </div>
                 {(ch.classes ?? []).map((cls, i) => {
                   const isLast = i === (ch.classes?.length ?? 0) - 1
                   return (
                     <div key={i} className={styles.classRow}>
                       <input className={styles.classFrom} type="number" step="any" value={cls.from}
-                        onChange={e => {
-                          const next = [...(ch.classes ?? [])]
-                          next[i] = { ...cls, from: parseFloat(e.target.value) || 0 }
-                          updateChannel(side, { classes: next })
-                        }} />
-                      <input className={styles.classTo} type="number" step="any"
-                        value={isLast ? '' : cls.to} disabled={isLast}
-                        style={isLast ? { opacity: 0.4 } : {}}
-                        onChange={e => {
-                          const next = [...(ch.classes ?? [])]
-                          next[i] = { ...cls, to: parseFloat(e.target.value) || 0 }
-                          updateChannel(side, { classes: next })
-                        }} />
+                        onChange={e => { const next=[...(ch.classes??[])]; next[i]={...cls,from:parseFloat(e.target.value)||0}; updateChannel(side,{classes:next}) }} />
+                      <input className={styles.classTo} type="number" step="any" value={isLast?'':cls.to} disabled={isLast} style={isLast?{opacity:0.4}:{}}
+                        onChange={e => { const next=[...(ch.classes??[])]; next[i]={...cls,to:parseFloat(e.target.value)||0}; updateChannel(side,{classes:next}) }} />
                       <input className={styles.classColor} type="color" value={cls.color}
-                        onChange={e => {
-                          const next = [...(ch.classes ?? [])]
-                          next[i] = { ...cls, color: e.target.value }
-                          updateChannel(side, { classes: next })
-                        }} />
+                        onChange={e => { const next=[...(ch.classes??[])]; next[i]={...cls,color:e.target.value}; updateChannel(side,{classes:next}) }} />
                       <button className={styles.classDel}
-                        onClick={() => {
-                          if ((ch.classes?.length ?? 0) <= 1) return
-                          const next = (ch.classes ?? []).filter((_, j) => j !== i)
-                          next[next.length-1] = { ...next[next.length-1], to: Infinity }
-                          updateChannel(side, { classes: next })
-                        }}>×</button>
+                        onClick={() => { if((ch.classes?.length??0)<=1)return; const next=(ch.classes??[]).filter((_,j)=>j!==i); next[next.length-1]={...next[next.length-1],to:Infinity}; updateChannel(side,{classes:next}) }}>×</button>
                     </div>
                   )
                 })}
-                <button className={styles.addClassBtn}
-                  onClick={() => {
-                    const cls = ch.classes ?? []
-                    const last = cls[cls.length-1]
-                    const newFrom = last ? (isFinite(last.to) ? last.to : last.from + 10) : 0
-                    const next: DiscreteClass[] = [...cls]
-                    if (last) next[next.length-1] = { ...last, to: newFrom }
-                    next.push({ from: newFrom, to: Infinity, color: '#3b82f6' })
-                    updateChannel(side, { classes: next })
-                  }}>+ Add class</button>
+                <button className={styles.addClassBtn} onClick={() => {
+                  const cls=ch.classes??[]; const last=cls[cls.length-1]
+                  const newFrom=last?(isFinite(last.to)?last.to:last.from+10):0
+                  const next:DiscreteClass[]=[...cls]
+                  if(last)next[next.length-1]={...last,to:newFrom}
+                  next.push({from:newFrom,to:Infinity,color:'#3b82f6'})
+                  updateChannel(side,{classes:next})
+                }}>+ Add class</button>
               </div>
             )}
-
-            {/* Bar length */}
             <div className={styles.barLenRow}>
               <div className={styles.barLenLbl}>Bar length</div>
               <input type="range" className={styles.sl} min={10} max={400} value={ch.maxLen}
@@ -237,12 +174,9 @@ export function MapPanel({ data: _data }: Props) {
 
       <Section title="Display" defaultOpen={true}>
         <div className={styles.opacityRow}>
-          <div className={styles.opacityLbl}>Opacity</div>
-          <input
-            type="range" className={styles.sl}
-            min={10} max={100} value={Math.round(barOpacity * 100)}
-            onChange={e => setBarOpacity(parseInt(e.target.value) / 100)}
-          />
+          <div className={styles.opacityLbl}>Bar opacity</div>
+          <input type="range" className={styles.sl} min={10} max={100} value={Math.round(barOpacity * 100)}
+            onChange={e => setBarOpacity(parseInt(e.target.value) / 100)} />
           <div className={styles.opacityVal}>{Math.round(barOpacity * 100)}%</div>
         </div>
       </Section>
@@ -252,38 +186,62 @@ export function MapPanel({ data: _data }: Props) {
           {layerOrder.map(key => {
             const l = LAYER_META[key]
             if (!l) return null
+            const isEditing = layerEdit === key
+            const ls = layerStyles[key]
             return (
-              <li
-                key={key}
-                className={`${styles.layerItem} ${layerVis[key] ? styles.active : ''}`}
-                draggable
-                onDragStart={() => onDragStart(key)}
-                onDragEnter={() => onDragEnter(key)}
-                onDragEnd={onDragEnd}
-                onDragOver={e => e.preventDefault()}
-              >
+              <li key={key} className={`${styles.layerItem} ${layerVis[key] ? styles.active : ''}`}
+                draggable onDragStart={() => onDragStart(key)} onDragEnter={() => onDragEnter(key)}
+                onDragEnd={onDragEnd} onDragOver={e => e.preventDefault()}>
                 <span className={styles.dragHandle}>⠿</span>
-                <div
-                  className={`${styles.toggle} ${layerVis[key] ? styles.on : ''}`}
-                  onClick={() => toggleLayer(key)}
-                />
+                <div className={`${styles.toggle} ${layerVis[key] ? styles.on : ''}`} onClick={() => toggleLayer(key)} />
                 <button className={styles.layerRowBtn} onClick={() => toggleLayer(key)}>
                   <div className={styles.layerSwatch} style={{ background: l.color }} />
                   <div className={styles.layerLabel}>{l.label}</div>
                 </button>
-                {key === 'grout' && layerVis.grout && (
-                  <select
-                    className={styles.paramSelect}
-                    value={groutParam}
-                    onChange={e => setGroutParam(e.target.value)}
-                    onClick={e => e.stopPropagation()}
-                    style={{ marginTop: 4, width: '100%', fontSize: 10 }}
-                  >
-                    {GROUT_PARAM_KEYS.map(k => {
-                      const p = GROUT_PARAMS[k]
-                      return <option key={k} value={k}>{p.label}{p.unit ? ` (${p.unit})` : ''}</option>
-                    })}
-                  </select>
+                {/* Edit button */}
+                <button
+                  className={`${styles.layerEditBtn} ${isEditing ? styles.layerEditBtnActive : ''}`}
+                  onClick={e => { e.stopPropagation(); setLayerEdit(isEditing ? null : key) }}
+                  title="Edit layer style"
+                >✎</button>
+
+                {/* Inline editor */}
+                {isEditing && (
+                  <div className={styles.layerEditor}>
+                    {/* Opacity */}
+                    <div className={styles.leRow}>
+                      <span className={styles.leLbl}>Opacity</span>
+                      <input type="range" className={styles.sl} min={0} max={100} value={Math.round(ls.opacity * 100)}
+                        onChange={e => updateLayerStyle(key, { opacity: parseInt(e.target.value) / 100 })} />
+                      <span className={styles.leVal}>{Math.round(ls.opacity * 100)}%</span>
+                    </div>
+                    {/* Color override (for layers that support it) */}
+                    {l.hasColor && (
+                      <div className={styles.leRow}>
+                        <span className={styles.leLbl}>Color</span>
+                        <input type="color" value={ls.color ?? '#00d4ff'}
+                          onChange={e => updateLayerStyle(key, { color: e.target.value })}
+                          style={{ width: 36, height: 22, padding: 1, border: '1px solid var(--border2)', borderRadius: 3, cursor:'pointer', background:'none' }} />
+                        <button className={styles.autoBtn} style={{ fontSize: 8 }}
+                          onClick={() => updateLayerStyle(key, { color: undefined })}>RESET</button>
+                      </div>
+                    )}
+                    {/* Attribute selector for grout */}
+                    {l.hasAttr && (
+                      <div className={styles.leRow}>
+                        <span className={styles.leLbl}>Color by</span>
+                        <select className={styles.paramSelect} style={{ marginBottom: 0 }}
+                          value={ls.attribute ?? 'inleakage'}
+                          onChange={e => updateLayerStyle(key, { attribute: e.target.value })}
+                          onClick={e => e.stopPropagation()}>
+                          {GROUT_PARAM_KEYS.map(k => {
+                            const p = GROUT_PARAMS[k]
+                            return <option key={k} value={k}>{p.label}{p.unit ? ` (${p.unit})` : ''}</option>
+                          })}
+                        </select>
+                      </div>
+                    )}
+                  </div>
                 )}
               </li>
             )

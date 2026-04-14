@@ -197,6 +197,7 @@
 .dragHandle:active { cursor:grabbing; }
 .layerItem {
   display:flex; align-items:center; gap:8px; padding:5px 0;
+  flex-wrap: wrap;
   cursor:pointer; border-radius:4px; transition:background .1s;
 }
 .toggle {
@@ -216,6 +217,41 @@
 .layerSwatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
 .layerLabel { font-size:11px; color:var(--text2); flex:1; text-align:left; }
 .layerItem.active .layerLabel { color:var(--text); }
+
+/* ── Layer edit button & inline editor ───────────────────────────────────── */
+.layerEditBtn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text3);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 1px 4px;
+  flex-shrink: 0;
+  transition: all .15s;
+  line-height: 1;
+}
+.layerEditBtn:hover { border-color: var(--border2); color: var(--text2); }
+.layerEditBtnActive { border-color: var(--accent2) !important; color: var(--accent) !important; background: rgba(0,136,170,.1) !important; }
+
+.layerEditor {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 9px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+.leRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.leRow:last-child { margin-bottom: 0; }
+.leLbl { font-size: 9px; color: var(--text3); width: 44px; flex-shrink: 0; }
+.leVal { font-family: var(--mono); font-size: 10px; color: var(--accent); width: 30px; text-align: right; flex-shrink: 0; }
 
 @media (max-width: 640px) {
   .panel { width: 252px; height: 100%; }

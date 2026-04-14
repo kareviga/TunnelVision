@@ -78,9 +78,9 @@ export function LeafletMap({ data }: Props) {
   const channels          = useStore(s => s.channels)
   const layerVis          = useStore(s => s.layerVis)
   const layerOrder        = useStore(s => s.layerOrder)
+  const layerStyles       = useStore(s => s.layerStyles)
   const barOpacity        = useStore(s => s.barOpacity)
   const basemap           = useStore(s => s.basemap)
-  const groutParam        = useStore(s => s.groutParam)
   const activeView        = useStore(s => s.activeView)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
@@ -190,7 +190,7 @@ export function LeafletMap({ data }: Props) {
       if (ei > 0) {
         L.polygon(
           [...leftPts.slice(0, ei+1), ...[...rightPts.slice(0, ei+1)].reverse()],
-          { pane:'tunnelPane', color:'#00d4ff', weight:0, fillColor:'#00d4ff', fillOpacity:0.22 }
+          { pane:'tunnelPane', color:'#00d4ff', weight:0, fillColor: layerStyles.tunnel.color || '#00d4ff', fillOpacity: layerStyles.tunnel.opacity }
         ).addTo(tl)
       }
       if (ei < al.length - 1) {
@@ -209,7 +209,7 @@ export function LeafletMap({ data }: Props) {
         { pane:'centerPane', color:'#00d4ff', weight:1.5, opacity:0.7 }
       ).addTo(map)
     }
-  }, [data, currentTs, layerVis.tunnel, layerVis.center])
+  }, [data, currentTs, layerVis.tunnel, layerVis.center, layerStyles.tunnel])
 
   // ── Draw rings ────────────────────────────────────────────────────────────
   const drawRings = useCallback(() => {
@@ -234,7 +234,7 @@ export function LeafletMap({ data }: Props) {
       const color = RING_TYPE_COLORS[t.ringType] ?? '#22c55e'
       L.polygon(
         [leftPts[idx], rightPts[idx], rightPts[idx+1], leftPts[idx+1]],
-        { pane:'ringsPane', color: '#000', weight: 0.5, fillColor: color, fillOpacity: 0.6 }
+        { pane:'ringsPane', color: '#000', weight: 0.5, fillColor: layerStyles.rings.color || color, fillOpacity: layerStyles.rings.opacity }
       )
         .bindTooltip(
           `<b style="color:${color}">Ring ${t.ring}</b><br/>` +
@@ -247,7 +247,7 @@ export function LeafletMap({ data }: Props) {
     }
     rl.addTo(map)
     layersRef.current.rings = rl
-  }, [data, currentTs, layerVis.rings])
+  }, [data, currentTs, layerVis.rings, layerStyles.rings])
 
   // ── Draw bars ─────────────────────────────────────────────────────────────
   const drawBars = useCallback(() => {
@@ -322,13 +322,12 @@ export function LeafletMap({ data }: Props) {
     const vis = data.grout.filter(g => g.ts <= currentTs)
     const gl = L.layerGroup()
     const fanRad = 8 * Math.PI / 180
-    const paramDef = GROUT_PARAMS[groutParam]
+    const groutStyle = layerStyles.grout
+    const groutAttr = groutStyle.attribute ?? 'inleakage'
+    const paramDef = GROUT_PARAMS[groutAttr]
 
     for (const g of vis) {
-      // Drilling-only: no injection took place
       const isDrillingOnly = (!g.injVol || g.injVol <= 0) && (!g.cement || g.cement <= 0)
-
-      // Trapezoid corners
       const backDir = (g.dir + 180) % 360
       const [bcLat, bcLon] = off(g.lat, g.lon, backDir, 6)
       const sHW = TUNNEL_R
@@ -337,34 +336,29 @@ export function LeafletMap({ data }: Props) {
       const perpR = (g.dir + 90) % 360
       const perpL = (g.dir - 90 + 360) % 360
       const corners: [number, number][] = [
-        off(bcLat, bcLon, perpL, sHW),
-        off(bcLat, bcLon, perpR, sHW),
-        off(fcLat, fcLon, perpR, eHW),
-        off(fcLat, fcLon, perpL, eHW),
+        off(bcLat, bcLon, perpL, sHW), off(bcLat, bcLon, perpR, sHW),
+        off(fcLat, fcLon, perpR, eHW), off(fcLat, fcLon, perpL, eHW),
       ]
-
       const tip =
         `<b style="color:var(--accent)">Screen CH ${formatCH(g.ch)}</b><br/>` +
         `${g.drillType} | Screen: ${g.screenLen}m<br/>` +
         `Inleakage: ${g.inleakage} L/min | Vol: ${g.injVol.toLocaleString()} L<br/>` +
         `Cement: ${g.cement} kg | Drillm: ${g.drillM} m`
-
-      const val = isDrillingOnly
-        ? 0
+      const val = isDrillingOnly ? 0
         : (paramDef ? (g as unknown as Record<string, number>)[paramDef.field] ?? 0 : 0)
-      const fillColor = groutAttrColor(val)
+      const fillColor = groutStyle.color || groutAttrColor(val)
       L.polygon(corners, {
         pane: 'groutPane',
         color:       isDrillingOnly ? '#ef4444' : '#555',
         weight:      isDrillingOnly ? 1.8 : 0.5,
         dashArray:   isDrillingOnly ? '6,4' : undefined,
         fillColor,
-        fillOpacity: 0.92,
+        fillOpacity: groutStyle.opacity,
       }).bindTooltip(tip, { sticky: true, className: 'tbm-tip' }).addTo(gl)
     }
     gl.addTo(map)
     layersRef.current.grout = gl
-  }, [data, currentTs, layerVis.grout, groutParam])
+  }, [data, currentTs, layerVis.grout, layerStyles.grout])
 
   // ── Draw manometers ───────────────────────────────────────────────────────
   const drawMano = useCallback(() => {

@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import type { ChannelState, LayerKey, ProfLayerKey } from '../types'
 import { getDefaultClasses, PARAMS } from '../data/params'
 
+export interface LayerStyle {
+  opacity: number    // 0–1 fill opacity
+  color?: string     // optional color override (null = use default)
+  attribute?: string // for grout: which attribute to color by
+}
+
 export interface PiezAnnotation {
   normalTs: number; normalVal: number   // baseline / normal pressure
   dropTs: number;   dropVal: number     // start of pressure drop
@@ -20,8 +26,18 @@ function makeChannel(param: string, scaleMin: number, scaleMax: number, discrete
 }
 
 const DEFAULT_LAYER_VIS: Record<LayerKey, boolean> = {
-  tunnel: true, center: true, markers: true, rings: true,
+  tunnel: false, center: true, markers: true, rings: true,
   grout: true, piezos: true, mano: false,
+}
+
+const DEFAULT_LAYER_STYLES: Record<LayerKey, LayerStyle> = {
+  tunnel:  { opacity: 0.22 },
+  center:  { opacity: 1 },
+  markers: { opacity: 1 },
+  rings:   { opacity: 1 },
+  grout:   { opacity: 1, attribute: 'inleakage' },
+  piezos:  { opacity: 1 },
+  mano:    { opacity: 1 },
 }
 
 interface AppStore {
@@ -46,17 +62,17 @@ interface AppStore {
   layerOrder: LayerKey[]
   setLayerOrder: (order: LayerKey[]) => void
 
-  // Map opacity
+  // Layer styles (opacity, color override, attribute)
+  layerStyles: Record<LayerKey, LayerStyle>
+  updateLayerStyle: (key: LayerKey, patch: Partial<LayerStyle>) => void
+
+  // Map opacity (bar charts)
   barOpacity: number
   setBarOpacity: (v: number) => void
 
   // Basemap
   basemap: 'voyager' | 'dark' | 'sat'
   setBasemap: (b: 'voyager' | 'dark' | 'sat') => void
-
-  // Grout param
-  groutParam: string
-  setGroutParam: (p: string) => void
 
   // Selected sensor (for chart popup)
   selectedSensor: { type: 'piezometer' | 'manometer'; id: string } | null
@@ -129,14 +145,15 @@ export const useStore = create<AppStore>((set, get) => ({
   layerOrder: ['piezos', 'mano', 'tunnel', 'center', 'rings', 'grout', 'markers'],
   setLayerOrder: order => set({ layerOrder: order }),
 
+  layerStyles: { ...DEFAULT_LAYER_STYLES },
+  updateLayerStyle: (key, patch) =>
+    set(s => ({ layerStyles: { ...s.layerStyles, [key]: { ...s.layerStyles[key], ...patch } } })),
+
   barOpacity: 0.8,
   setBarOpacity: v => set({ barOpacity: v }),
 
   basemap: 'voyager',
   setBasemap: b => set({ basemap: b }),
-
-  groutParam: 'inleakage',
-  setGroutParam: p => set({ groutParam: p }),
 
   selectedSensor: null,
   setSelectedSensor: s => set({ selectedSensor: s }),
