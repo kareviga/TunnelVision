@@ -77,6 +77,17 @@
   color: var(--text3);
 }
 
+.scalePanel {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 14px;
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
 .canvasWrap {
   flex: 1;
   position: relative;

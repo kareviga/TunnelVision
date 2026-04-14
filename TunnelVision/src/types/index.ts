@@ -261,7 +261,7 @@ export interface ChannelState {
 export type LayerKey = 'tunnel' | 'center' | 'markers' | 'rings' | 'grout' | 'piezos' | 'mano'
 
 export type ProfParam = 'fpi' | 'thrust' | 'torque' | 'pen_hr'
-export type ProfLayerKey = 'grout' | 'piezos' | 'mano' | 'soil' | 'rock'
+export type ProfLayerKey = 'grout' | 'mano' | 'soil' | 'rock'
 
 // ── Param catalogue entry ─────────────────────────────────────────────────────
 

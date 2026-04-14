@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChannelState, LayerKey, ProfParam, ProfLayerKey } from '../types'
+import type { ChannelState, LayerKey, ProfLayerKey } from '../types'
 import { getDefaultClasses, PARAMS } from '../data/params'
 
 export interface PiezAnnotation {
@@ -80,8 +80,8 @@ interface AppStore {
   toggleTheme: () => void
 
   // Profile view
-  profParam: ProfParam
-  setProfParam: (p: ProfParam) => void
+  profChannel: ChannelState
+  updateProfChannel: (patch: Partial<ChannelState>) => void
   profLayers: Record<ProfLayerKey, boolean>
   toggleProfLayer: (k: ProfLayerKey) => void
 }
@@ -103,14 +103,24 @@ export const useStore = create<AppStore>((set, get) => ({
   updateChannel: (side, patch) =>
     set(s => {
       const ch = { ...s.channels[side], ...patch }
-      // If param changed, reset classes & scale
       if (patch.param && patch.param !== s.channels[side].param) {
         const def = PARAMS[patch.param]
         ch.scaleMin = def?.min ?? 0
         ch.scaleMax = def?.max ?? 1
         if (ch.discrete) ch.classes = getDefaultClasses(patch.param)
       }
-      return { channels: { ...s.channels, [side]: ch } }
+      const result: Partial<typeof s> = { channels: { ...s.channels, [side]: ch } }
+      // Sync scale to profChannel when right channel and same param
+      if (side === 'right') {
+        const scaleKeys = ['scaleMin','scaleMax','discrete','classes','inverted'] as const
+        const hasScale = scaleKeys.some(k => k in patch)
+        if (hasScale && s.profChannel.param === ch.param) {
+          const sp: Partial<ChannelState> = {}
+          scaleKeys.forEach(k => { if (k in patch) (sp as Record<string,unknown>)[k] = ch[k] })
+          result.profChannel = { ...s.profChannel, ...sp }
+        }
+      }
+      return result
     }),
 
   layerVis: { ...DEFAULT_LAYER_VIS },
@@ -154,9 +164,33 @@ export const useStore = create<AppStore>((set, get) => ({
     return { theme: next }
   }),
 
-  profParam: 'fpi',
-  setProfParam: p => set({ profParam: p }),
-  profLayers: { grout: true, piezos: true, mano: true, soil: true, rock: true },
+  profChannel: makeChannel('fpi', 0, 77, true),
+  updateProfChannel: (patch) =>
+    set(s => {
+      let prof = { ...s.profChannel, ...patch }
+      if (patch.param && patch.param !== s.profChannel.param) {
+        if (s.channels.right.param === patch.param) {
+          const { scaleMin, scaleMax, discrete, classes, inverted } = s.channels.right
+          prof = { ...prof, scaleMin, scaleMax, discrete, classes, inverted }
+        } else {
+          const def = PARAMS[patch.param]
+          prof.scaleMin = def?.min ?? 0
+          prof.scaleMax = def?.max ?? 1
+          if (prof.discrete) prof.classes = getDefaultClasses(patch.param)
+        }
+      }
+      const result: Partial<typeof s> = { profChannel: prof }
+      // Sync scale to right channel when same param
+      const scaleKeys = ['scaleMin','scaleMax','discrete','classes','inverted'] as const
+      const hasScale = scaleKeys.some(k => k in patch)
+      if (hasScale && s.channels.right.param === prof.param) {
+        const sp: Partial<ChannelState> = {}
+        scaleKeys.forEach(k => { if (k in patch) (sp as Record<string,unknown>)[k] = prof[k] })
+        result.channels = { ...s.channels, right: { ...s.channels.right, ...sp } }
+      }
+      return result
+    }),
+  profLayers: { grout: true, mano: true, soil: true, rock: true },
   toggleProfLayer: k =>
     set(s => ({ profLayers: { ...s.profLayers, [k]: !s.profLayers[k] } })),
 }))
