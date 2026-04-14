@@ -58,6 +58,7 @@ interface Props { data: AppData | null }
 export function ThreeDView({ data }: Props) {
   const currentTs      = useStore(s => s.currentTs)
   const zoomToTBMTick  = useStore(s => s.zoomToTBMTick)
+  const theme          = useStore(s => s.theme)
   const mountRef   = useRef<HTMLDivElement>(null)
   const stateRef   = useRef<SceneState | null>(null)
 
@@ -297,6 +298,19 @@ export function ThreeDView({ data }: Props) {
 
   }, [currentTs, data])
 
+  // ── Theme change: update renderer background + fog ───────────────────────
+  useEffect(() => {
+    const s = stateRef.current
+    if (!s) return
+    const light = theme === 'light'
+    const bgColor  = light ? 0xe4eaf2 : 0x080a0e
+    const fogColor = light ? 0xd8e0ec : 0x0a0d14
+    s.renderer.setClearColor(bgColor)
+    if (s.scene.fog instanceof THREE.FogExp2) {
+      s.scene.fog.color.setHex(fogColor)
+    }
+  }, [theme])
+
   // ── Zoom to TBM ───────────────────────────────────────────────────────────
   useEffect(() => {
     const s = stateRef.current
@@ -316,7 +330,7 @@ export function ThreeDView({ data }: Props) {
   }, [zoomToTBMTick])
 
   return (
-    <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#080a0e' }}>
+    <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
       {!data && (
         <div className={styles.loading}>LOADING 3D DATA…</div>

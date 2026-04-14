@@ -24,6 +24,7 @@ export function ProfileView({ data }: Props) {
   const currentTs        = useStore(s => s.currentTs)
   const channels         = useStore(s => s.channels)
   const zoomToTBMTick    = useStore(s => s.zoomToTBMTick)
+  const theme            = useStore(s => s.theme)
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const wrapRef    = useRef<HTMLDivElement>(null)
@@ -248,7 +249,7 @@ export function ProfileView({ data }: Props) {
     ctx.fillStyle = 'rgba(10,12,16,0.8)'; ctx.fillRect(PL+8, PT+6, 130, 20)
     ctx.fillStyle = pcol; ctx.font = '10px Share Tech Mono'
     ctx.textAlign = 'left'; ctx.fillText(`${pcfg.label} (${pcfg.unit})`, PL+14, PT+19)
-  }, [data, currentTs, profParam, profLayers, channels, vExag])
+  }, [data, currentTs, profParam, profLayers, channels, vExag, theme])
 
   // Resize + redraw on mount / resize
   useEffect(() => {
