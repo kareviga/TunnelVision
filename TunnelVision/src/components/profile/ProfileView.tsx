@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { formatCH } from '../../utils/format'
 import { valToColor, groutValToRGB } from '../../utils/color'
@@ -32,8 +32,11 @@ export function ProfileView({ data }: Props) {
   const isDragging = useRef(false)
   const dragStart  = useRef({ x: 0, chMin: 0, chMax: 0 })
 
+  const [vExag, setVExag] = useState(1)
+
   // ── Draw ─────────────────────────────────────────────────────────────────
-  const draw = useCallback(() => {
+  const draw = useCallback((vExagOverride?: number) => {
+    const ve = vExagOverride ?? vExag
     const canvas = canvasRef.current
     if (!canvas || !data?.profile.length) return
     const wrap = wrapRef.current!
@@ -50,15 +53,12 @@ export function ProfileView({ data }: Props) {
     const pts = data.profile.filter(p => p.ch >= chMin-50 && p.ch <= chMax+50)
     if (!pts.length) return
 
-    const scaleX = PW / (chMax - chMin)
-    const scaleY = PH / (eMax  - eMin)
-    const scale  = Math.min(scaleX, scaleY)
-    const usedW  = (chMax - chMin) * scale
-    const usedH  = (eMax  - eMin)  * scale
-    const offX   = (PW - usedW) / 2
+    const scaleH = PW / (chMax - chMin)           // horizontal fills width
+    const scaleV = scaleH * ve                     // vertical = horizontal × exaggeration
+    const usedH  = (eMax - eMin) * scaleV
     const offY   = (PH - usedH) / 2
-    const cx = (ch: number) => PL + offX + (ch - chMin) * scale
-    const cy = (el: number) => PT + offY + (eMax - el)  * scale
+    const cx = (ch: number) => PL + (ch - chMin) * scaleH
+    const cy = (el: number) => PT + offY + (eMax - el) * scaleV
 
     // Background
     ctx.fillStyle = '#080a0e'
@@ -210,7 +210,7 @@ export function ProfileView({ data }: Props) {
     ctx.fillStyle = 'rgba(10,12,16,0.8)'; ctx.fillRect(PL+8, PT+6, 130, 20)
     ctx.fillStyle = pcol; ctx.font = '10px Share Tech Mono'
     ctx.textAlign = 'left'; ctx.fillText(`${pcfg.label} (${pcfg.unit})`, PL+14, PT+19)
-  }, [data, currentTs, profParam, profLayers, channels])
+  }, [data, currentTs, profParam, profLayers, channels, vExag])
 
   // Resize + redraw on mount / resize
   useEffect(() => {
@@ -385,6 +385,20 @@ export function ProfileView({ data }: Props) {
         onMouseLeave={onMouseUp}
       >
         <canvas ref={canvasRef} style={{ display:'block', cursor:'crosshair', width:'100%', height:'100%' }} />
+
+        {/* Vertical exaggeration slider */}
+        <div className={styles.vExagWrap}>
+          <span className={styles.vExagLbl}>{vExag}×</span>
+          <input
+            type="range"
+            min={1} max={20} step={0.5}
+            value={vExag}
+            onChange={e => setVExag(Number(e.target.value))}
+            className={styles.vExagSlider}
+            title={`Vertical exaggeration: ${vExag}×`}
+          />
+          <span className={styles.vExagTag}>V.EXAG</span>
+        </div>
       </div>
     </div>
   )
