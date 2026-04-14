@@ -260,7 +260,7 @@ export function ProfileView({ data }: Props) {
     const v = viewRef.current
     const span = v.chMax - v.chMin
     const delta = e.deltaY > 0 ? 1.15 : 0.87
-    const newSpan = Math.max(500, Math.min(11100, span * delta))
+    const newSpan = Math.max(150, Math.min(11100, span * delta))
     const mid = (v.chMin + v.chMax) / 2
     viewRef.current = { ...v, chMin: mid - newSpan/2, chMax: mid + newSpan/2 }
     draw()
@@ -312,7 +312,7 @@ export function ProfileView({ data }: Props) {
       } else {
         const newDist = touchDist(e); if (!ts.dist || !newDist) return
         const factor = ts.dist / newDist
-        const newSpan = Math.max(500, Math.min(11100, (ts.chMax - ts.chMin) * factor))
+        const newSpan = Math.max(150, Math.min(11100, (ts.chMax - ts.chMin) * factor))
         const mid = (ts.chMin + ts.chMax) / 2
         viewRef.current = { ...v, chMin: mid - newSpan/2, chMax: mid + newSpan/2 }
         touchStartRef.current = { ...ts, dist: newDist, chMin: viewRef.current.chMin, chMax: viewRef.current.chMax }

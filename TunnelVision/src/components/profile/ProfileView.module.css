@@ -136,3 +136,35 @@
   accent-color: var(--accent);
   pointer-events: all;
 }
+
+@media (max-width: 640px) {
+  .vExagWrap {
+    right: auto;
+    left: 10px;
+    bottom: 10px;
+    top: auto;
+    transform: none;
+    flex-direction: row;
+    align-items: center;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 5px 10px;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .vExagSlider {
+    writing-mode: horizontal-tb;
+    direction: ltr;
+    width: 120px;
+    height: 20px;
+    pointer-events: all;
+  }
+
+  .vExagTag {
+    writing-mode: horizontal-tb;
+    transform: none;
+    margin-top: 0;
+  }
+}
