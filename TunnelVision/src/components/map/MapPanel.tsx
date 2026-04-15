@@ -5,14 +5,14 @@ import { discreteRampCSS, rampCSS, FPI_RAMP, RAMP } from '../../utils/color'
 import type { AppData, LayerKey, DiscreteClass } from '../../types'
 import styles from './MapPanel.module.css'
 
-const LAYER_META: Record<LayerKey, { label: string; color: string; hasAttr?: boolean; hasColor?: boolean }> = {
-  piezos:  { label: 'Piezometers',          color: '#f472b6' },
-  mano:    { label: 'Manometers',           color: '#fb923c' },
-  tunnel:  { label: 'Tunnel body',          color: 'rgba(0,212,255,.5)', hasColor: true },
-  center:  { label: 'Centreline',           color: '#00d4ff', hasColor: true },
-  rings:   { label: 'Ring types',           color: 'linear-gradient(to right,#22c55e,#eab308,#111,#ef4444)' },
-  grout:   { label: 'Drilling & grouting',  color: '#818cf8', hasAttr: true },
-  markers: { label: 'CH markers',           color: '#888' },
+const LAYER_META: Record<LayerKey, { label: string; color: string; defaultColor: string; hasAttr?: boolean }> = {
+  piezos:  { label: 'Piezometers',          color: '#f472b6',                                              defaultColor: '#f472b6' },
+  mano:    { label: 'Manometers',           color: '#fb923c',                                              defaultColor: '#fb923c' },
+  tunnel:  { label: 'Tunnel body',          color: 'rgba(0,212,255,.5)',                                   defaultColor: '#00d4ff' },
+  center:  { label: 'Centreline',           color: '#00d4ff',                                              defaultColor: '#00d4ff' },
+  rings:   { label: 'Ring types',           color: 'linear-gradient(to right,#22c55e,#eab308,#111,#ef4444)', defaultColor: '#22c55e' },
+  grout:   { label: 'Drilling & grouting',  color: '#818cf8',                                              defaultColor: '#818cf8', hasAttr: true },
+  markers: { label: 'CH markers',           color: '#888888',                                              defaultColor: '#888888' },
 }
 
 interface Props { data: AppData | null }
@@ -193,17 +193,17 @@ export function MapPanel({ data: _data }: Props) {
                 draggable onDragStart={() => onDragStart(key)} onDragEnter={() => onDragEnter(key)}
                 onDragEnd={onDragEnd} onDragOver={e => e.preventDefault()}>
                 <span className={styles.dragHandle}>⠿</span>
-                <div className={`${styles.toggle} ${layerVis[key] ? styles.on : ''}`} onClick={() => toggleLayer(key)} />
-                <button className={styles.layerRowBtn} onClick={() => toggleLayer(key)}>
-                  <div className={styles.layerSwatch} style={{ background: l.color }} />
-                  <div className={styles.layerLabel}>{l.label}</div>
-                </button>
-                {/* Edit button */}
+                {/* Edit button — leftmost after drag handle */}
                 <button
                   className={`${styles.layerEditBtn} ${isEditing ? styles.layerEditBtnActive : ''}`}
                   onClick={e => { e.stopPropagation(); setLayerEdit(isEditing ? null : key) }}
                   title="Edit layer style"
                 >✎</button>
+                <div className={`${styles.toggle} ${layerVis[key] ? styles.on : ''}`} onClick={() => toggleLayer(key)} />
+                <button className={styles.layerRowBtn} onClick={() => toggleLayer(key)}>
+                  <div className={styles.layerSwatch} style={{ background: l.color }} />
+                  <div className={styles.layerLabel}>{l.label}</div>
+                </button>
 
                 {/* Inline editor */}
                 {isEditing && (
@@ -215,17 +215,15 @@ export function MapPanel({ data: _data }: Props) {
                         onChange={e => updateLayerStyle(key, { opacity: parseInt(e.target.value) / 100 })} />
                       <span className={styles.leVal}>{Math.round(ls.opacity * 100)}%</span>
                     </div>
-                    {/* Color override (for layers that support it) */}
-                    {l.hasColor && (
-                      <div className={styles.leRow}>
-                        <span className={styles.leLbl}>Color</span>
-                        <input type="color" value={ls.color ?? '#00d4ff'}
-                          onChange={e => updateLayerStyle(key, { color: e.target.value })}
-                          style={{ width: 36, height: 22, padding: 1, border: '1px solid var(--border2)', borderRadius: 3, cursor:'pointer', background:'none' }} />
-                        <button className={styles.autoBtn} style={{ fontSize: 8 }}
-                          onClick={() => updateLayerStyle(key, { color: undefined })}>RESET</button>
-                      </div>
-                    )}
+                    {/* Color override — all layers */}
+                    <div className={styles.leRow}>
+                      <span className={styles.leLbl}>Color</span>
+                      <input type="color" value={ls.color ?? l.defaultColor}
+                        onChange={e => updateLayerStyle(key, { color: e.target.value })}
+                        style={{ width: 36, height: 22, padding: 1, border: '1px solid var(--border2)', borderRadius: 3, cursor:'pointer', background:'none' }} />
+                      <button className={styles.autoBtn} style={{ fontSize: 8 }}
+                        onClick={() => updateLayerStyle(key, { color: undefined })}>RESET</button>
+                    </div>
                     {/* Attribute selector for grout */}
                     {l.hasAttr && (
                       <div className={styles.leRow}>

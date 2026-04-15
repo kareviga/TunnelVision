@@ -56,6 +56,21 @@ const ANNOT_COLORS: Record<NonNullable<AnnotMode>, string> = {
   recovery: '#22c55e',
 }
 
+interface ChartColors {
+  bg: string; border: string; border2: string; text3: string; textMuted: string
+}
+
+function getChartColors(): ChartColors {
+  const cs = getComputedStyle(document.documentElement)
+  return {
+    bg:        cs.getPropertyValue('--bg2').trim()    || '#0d1117',
+    border:    cs.getPropertyValue('--border').trim() || '#1e2a38',
+    border2:   cs.getPropertyValue('--border2').trim()|| '#2a3a50',
+    text3:     cs.getPropertyValue('--text3').trim()  || '#7090a8',
+    textMuted: cs.getPropertyValue('--text3').trim()  || '#3a5068',
+  }
+}
+
 function drawChart(
   ctx: CanvasRenderingContext2D,
   w: number, h: number,
@@ -65,6 +80,7 @@ function drawChart(
   valueUnit: string,
   currentTs: number,
   viewTs: { min: number; max: number },
+  colors: ChartColors,
   annotation?: Partial<PiezAnnotation>,
   hoverPt?: { ts: number; val: number; color: string } | null,
   crosshairTs?: number | null,
@@ -73,11 +89,11 @@ function drawChart(
   const ch = h - MT - MB
 
   ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = '#0d1117'
+  ctx.fillStyle = colors.bg
   ctx.fillRect(0, 0, w, h)
 
   if (!valueSeries.length) {
-    ctx.fillStyle = '#7090a8'
+    ctx.fillStyle = colors.text3
     ctx.font = '13px monospace'
     ctx.textAlign = 'center'
     ctx.fillText('No data available for this sensor', w / 2, h / 2)
@@ -100,7 +116,7 @@ function drawChart(
   function cyd(d: number) { return MT + ch - (d / dMax) * ch }
 
   // ── Grid ───────────────────────────────────────────────────────────────────
-  ctx.strokeStyle = '#1e2a38'
+  ctx.strokeStyle = colors.border
   ctx.lineWidth = 1
   const yTicks = 5
   for (let i = 0; i <= yTicks; i++) {
@@ -134,7 +150,7 @@ function drawChart(
 
   // ── Annotation vertical lines ─────────────────────────────────────────────
   const annotDefs: Array<{ key: keyof PiezAnnotation; valKey: keyof PiezAnnotation; color: string; label: string }> = [
-    { key: 'normalTs',   valKey: 'normalVal',   color: '#e2e8f0', label: 'Normal'   },
+    { key: 'normalTs',   valKey: 'normalVal',   color: 'var(--text)', label: 'Normal'   },
     { key: 'dropTs',     valKey: 'dropVal',     color: '#f97316', label: 'Drop'     },
     { key: 'recoveryTs', valKey: 'recoveryVal', color: '#22c55e', label: 'Recovery' },
   ]
@@ -164,7 +180,7 @@ function drawChart(
         ctx.arc(x, y, 4, 0, Math.PI * 2)
         ctx.fillStyle = color
         ctx.fill()
-        ctx.strokeStyle = '#0d1117'
+        ctx.strokeStyle = colors.bg
         ctx.lineWidth = 1
         ctx.stroke()
       }
@@ -230,7 +246,7 @@ function drawChart(
   if (crosshairTs !== null && crosshairTs !== undefined) {
     const x = cx(crosshairTs)
     if (x >= ML && x <= ML + cw) {
-      ctx.strokeStyle = '#7090a8'
+      ctx.strokeStyle = colors.text3
       ctx.lineWidth = 1
       ctx.globalAlpha = 0.6
       ctx.setLineDash([2, 3])
@@ -240,7 +256,7 @@ function drawChart(
 
       const d = new Date(crosshairTs * 1000)
       const label = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
-      ctx.fillStyle = '#7090a8'
+      ctx.fillStyle = colors.text3
       ctx.font = '10px monospace'
       ctx.textAlign = x < ML + cw / 2 ? 'left' : 'right'
       ctx.fillText(label, x + (x < ML + cw / 2 ? 4 : -4), MT + ch - 4)
@@ -248,7 +264,7 @@ function drawChart(
   }
 
   // ── Axes ───────────────────────────────────────────────────────────────────
-  ctx.strokeStyle = '#2a3a50'
+  ctx.strokeStyle = colors.border2
   ctx.lineWidth = 1
   ctx.beginPath()
   ctx.moveTo(ML, MT); ctx.lineTo(ML, MT + ch); ctx.lineTo(ML + cw, MT + ch)
@@ -290,13 +306,13 @@ function drawChart(
   // ── X axis ticks + labels ─────────────────────────────────────────────────
   const daySpan = tsSpan / 86400
   const nTicks = Math.min(8, Math.max(3, Math.floor(cw / 80)))
-  ctx.fillStyle = '#7090a8'
+  ctx.fillStyle = colors.text3
   ctx.textAlign = 'center'
   ctx.font = '10px monospace'
   for (let i = 0; i <= nTicks; i++) {
     const ts = tsMin + (tsSpan / nTicks) * i
     const x  = cx(ts)
-    ctx.strokeStyle = '#2a3a50'
+    ctx.strokeStyle = colors.border2
     ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(x, MT + ch); ctx.lineTo(x, MT + ch + 4); ctx.stroke()
     const d = new Date(ts * 1000)
@@ -320,17 +336,17 @@ function drawChart(
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const zoomBtnStyle: React.CSSProperties = {
-  width: 24, height: 24, background: 'rgba(15,18,24,.9)', border: '1px solid #253040',
-  borderRadius: 3, color: '#7090a8', cursor: 'pointer', fontSize: 13,
+  width: 24, height: 24, background: 'var(--bg3)', border: '1px solid var(--border2)',
+  borderRadius: 3, color: 'var(--text3)', cursor: 'pointer', fontSize: 13,
   display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace',
 }
 
 function annotBtnStyle(active: boolean, color: string): React.CSSProperties {
   return {
     padding: '4px 12px', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer',
-    borderRadius: 3, border: `1px solid ${active ? color : '#253040'}`,
-    background: active ? color + '22' : 'rgba(15,18,24,.9)',
-    color: active ? color : '#7090a8',
+    borderRadius: 3, border: `1px solid ${active ? color : 'var(--border2)'}`,
+    background: active ? color + '22' : 'var(--bg3)',
+    color: active ? color : 'var(--text3)',
     letterSpacing: 0.5,
   }
 }
@@ -369,6 +385,7 @@ export function SensorChart({ data }: Props) {
   const piezAnnotations     = useStore(s => s.piezAnnotations)
   const setPiezAnnotation   = useStore(s => s.setPiezAnnotation)
   const clearPiezAnnotation = useStore(s => s.clearPiezAnnotation)
+  const theme               = useStore(s => s.theme)
   const canvasRef           = useRef<HTMLCanvasElement>(null)
 
   const [annotMode, setAnnotMode] = useState<AnnotMode>(null)
@@ -446,9 +463,9 @@ export function SensorChart({ data }: Props) {
     drawChart(
       ctx, rect.width, rect.height,
       valueSeries, distSeries, valueLabel, valueUnit,
-      currentTs, viewRef.current, annotation, hoverPt, ch,
+      currentTs, viewRef.current, getChartColors(), annotation, hoverPt, ch,
     )
-  }, [valueSeries, distSeries, valueLabel, valueUnit, currentTs, annotation])
+  }, [valueSeries, distSeries, valueLabel, valueUnit, currentTs, annotation, theme])
 
   useEffect(() => { draw() }, [draw])
 
@@ -579,7 +596,7 @@ export function SensorChart({ data }: Props) {
           drawChart(
             ctx, rect.width, rect.height,
             valueSeriesRef.current, distSeries, valueLabel, valueUnit,
-            currentTs, viewRef.current, annotation,
+            currentTs, viewRef.current, getChartColors(), annotation,
             { ts: pt[0], val: pt[1], color: ANNOT_COLORS[mode] },
           )
         }
@@ -617,7 +634,7 @@ export function SensorChart({ data }: Props) {
       drawChart(
         ctx, rect.width, rect.height,
         valueSeriesRef.current, distSeries, valueLabel, valueUnit,
-        currentTs, viewRef.current, annotation, null,
+        currentTs, viewRef.current, getChartColors(), annotation, null,
       )
     }
 
@@ -704,7 +721,7 @@ export function SensorChart({ data }: Props) {
       onClick={e => { if (e.target === e.currentTarget) setSelectedSensor(null) }}
     >
       <div style={{
-        background: '#0d1117', border: '1px solid #1e2a38',
+        background: 'var(--bg2)', border: '1px solid var(--border)',
         borderRadius: 6, padding: '16px 18px',
         width: 'min(760px, 94vw)', boxShadow: '0 8px 32px rgba(0,0,0,.7)',
         maxHeight: '90vh', overflowY: 'auto',
@@ -715,7 +732,7 @@ export function SensorChart({ data }: Props) {
             <div style={{ color: '#00d4ff', fontFamily: 'var(--cond)', fontSize: 15, fontWeight: 600, letterSpacing: 1 }}>
               {title}
             </div>
-            <div style={{ color: '#7090a8', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
+            <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
               {subtitle}
             </div>
             <div style={{ color: '#ef4444', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
@@ -732,8 +749,8 @@ export function SensorChart({ data }: Props) {
           <button
             onClick={() => setSelectedSensor(null)}
             style={{
-              background: 'transparent', border: '1px solid #2a3a50',
-              borderRadius: 3, color: '#7090a8', cursor: 'pointer',
+              background: 'transparent', border: '1px solid var(--border2)',
+              borderRadius: 3, color: 'var(--text3)', cursor: 'pointer',
               fontSize: 16, lineHeight: 1, padding: '2px 8px', fontFamily: 'monospace',
             }}
           >×</button>
@@ -756,7 +773,7 @@ export function SensorChart({ data }: Props) {
             <button onClick={() => { const s = viewRef.current.max - viewRef.current.min; const m = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, m - s * 0.85), max: Math.min(fullTsMax, m + s * 0.85) }; draw(null) }} style={zoomBtnStyle}>−</button>
             <button onClick={() => { viewRef.current = { min: fullTsMin, max: fullTsMax }; draw(null) }} style={zoomBtnStyle}>⊡</button>
           </div>
-          <div style={{ position: 'absolute', bottom: 6, left: ML, fontSize: 9, fontFamily: 'monospace', color: '#3a5068', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', bottom: 6, left: ML, fontSize: 9, fontFamily: 'monospace', color: 'var(--text3)', opacity: 0.6, pointerEvents: 'none' }}>
             {annotMode ? 'hover to preview · click/tap to place' : 'scroll/pinch to zoom · drag to pan'}
           </div>
         </div>
@@ -765,9 +782,9 @@ export function SensorChart({ data }: Props) {
         {isPiez && (
           <div style={{
             display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap',
-            marginTop: 10, paddingTop: 10, borderTop: '1px solid #1e2a38',
+            marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)',
           }}>
-            <span style={{ color: '#4a6070', fontFamily: 'monospace', fontSize: 10, marginRight: 2 }}>MARK:</span>
+            <span style={{ color: 'var(--text3)', fontFamily: 'monospace', fontSize: 10, marginRight: 2 }}>MARK:</span>
             <button style={annotBtnStyle(annotMode === 'normal',   '#e2e8f0')} onClick={() => setAnnotMode(m => m === 'normal'   ? null : 'normal')}>⊕ Normal</button>
             <button style={annotBtnStyle(annotMode === 'drop',     '#f97316')} onClick={() => setAnnotMode(m => m === 'drop'     ? null : 'drop')}>⊕ Start drop</button>
             <button style={annotBtnStyle(annotMode === 'recovery', '#22c55e')} onClick={() => setAnnotMode(m => m === 'recovery' ? null : 'recovery')}>⊕ Recovery</button>
@@ -782,32 +799,32 @@ export function SensorChart({ data }: Props) {
         {isPiez && hasAnnot && (
           <div style={{
             marginTop: 10, fontFamily: 'monospace', fontSize: 11,
-            border: '1px solid #1e2a38', borderRadius: 4, overflow: 'hidden',
+            border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden',
           }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#111827' }}>
-                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'left',  fontSize: 10 }}>Marker</th>
-                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'left',  fontSize: 10 }}>Date</th>
-                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'right', fontSize: 10 }}>Chainage (m)</th>
-                  <th style={{ padding: '5px 10px', color: '#4a6070', fontWeight: 400, textAlign: 'right', fontSize: 10 }}>Pressure (kPa)</th>
+                <tr style={{ background: 'var(--bg3)' }}>
+                  <th style={{ padding: '5px 10px', color: 'var(--text3)', fontWeight: 400, textAlign: 'left',  fontSize: 10 }}>Marker</th>
+                  <th style={{ padding: '5px 10px', color: 'var(--text3)', fontWeight: 400, textAlign: 'left',  fontSize: 10 }}>Date</th>
+                  <th style={{ padding: '5px 10px', color: 'var(--text3)', fontWeight: 400, textAlign: 'right', fontSize: 10 }}>Chainage (m)</th>
+                  <th style={{ padding: '5px 10px', color: 'var(--text3)', fontWeight: 400, textAlign: 'right', fontSize: 10 }}>Pressure (kPa)</th>
                 </tr>
               </thead>
               <tbody>
                 {annotation?.normalTs && (
-                  <tr style={{ borderTop: '1px solid #1a2535' }}>
-                    <td style={{ padding: '5px 10px', color: '#e2e8f0' }}>Normal</td>
-                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>{fmtDate(annotation.normalTs)}</td>
-                    <td style={{ padding: '5px 10px', color: '#e2e8f0', textAlign: 'right' }}>
+                  <tr style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '5px 10px', color: 'var(--text)' }}>Normal</td>
+                    <td style={{ padding: '5px 10px', color: 'var(--text3)' }}>{fmtDate(annotation.normalTs)}</td>
+                    <td style={{ padding: '5px 10px', color: 'var(--text)', textAlign: 'right' }}>
                       {chainageAtTs(annotation.normalTs, data.tbm)?.toFixed(0) ?? '—'}
                     </td>
-                    <td style={{ padding: '5px 10px', color: '#e2e8f0', textAlign: 'right' }}>{annotation.normalVal?.toFixed(1)}</td>
+                    <td style={{ padding: '5px 10px', color: 'var(--text)', textAlign: 'right' }}>{annotation.normalVal?.toFixed(1)}</td>
                   </tr>
                 )}
                 {annotation?.dropTs && (
-                  <tr style={{ borderTop: '1px solid #1a2535' }}>
+                  <tr style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '5px 10px', color: '#f97316' }}>Start drop</td>
-                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>{fmtDate(annotation.dropTs)}</td>
+                    <td style={{ padding: '5px 10px', color: 'var(--text3)' }}>{fmtDate(annotation.dropTs)}</td>
                     <td style={{ padding: '5px 10px', color: '#f97316', textAlign: 'right' }}>
                       {dropCh?.toFixed(0) ?? '—'}
                     </td>
@@ -815,9 +832,9 @@ export function SensorChart({ data }: Props) {
                   </tr>
                 )}
                 {annotation?.recoveryTs && (
-                  <tr style={{ borderTop: '1px solid #1a2535' }}>
+                  <tr style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '5px 10px', color: '#22c55e' }}>Start recovery</td>
-                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>{fmtDate(annotation.recoveryTs)}</td>
+                    <td style={{ padding: '5px 10px', color: 'var(--text3)' }}>{fmtDate(annotation.recoveryTs)}</td>
                     <td style={{ padding: '5px 10px', color: '#22c55e', textAlign: 'right' }}>
                       {recoveryCh?.toFixed(0) ?? '—'}
                     </td>
@@ -825,15 +842,15 @@ export function SensorChart({ data }: Props) {
                   </tr>
                 )}
                 {(affectedPeriod !== null || affectedStretch !== null) && (
-                  <tr style={{ borderTop: '1px solid #253040', background: '#111827' }}>
+                  <tr style={{ borderTop: '1px solid var(--border2)', background: 'var(--bg3)' }}>
                     <td style={{ padding: '5px 10px', color: '#f59e0b' }}>Affected</td>
-                    <td style={{ padding: '5px 10px', color: '#7090a8' }}>
+                    <td style={{ padding: '5px 10px', color: 'var(--text3)' }}>
                       {affectedPeriod !== null ? fmtDuration(affectedPeriod) : '—'}
                     </td>
                     <td style={{ padding: '5px 10px', color: '#f59e0b', textAlign: 'right' }}>
                       {affectedStretch !== null ? `${affectedStretch.toFixed(0)} m` : '—'}
                     </td>
-                    <td style={{ padding: '5px 10px', color: '#7090a8', textAlign: 'right' }}>
+                    <td style={{ padding: '5px 10px', color: 'var(--text3)', textAlign: 'right' }}>
                       {annotation?.dropVal !== undefined && annotation?.recoveryVal !== undefined
                         ? `Δ ${(annotation.dropVal - annotation.recoveryVal).toFixed(1)}`
                         : '—'}
