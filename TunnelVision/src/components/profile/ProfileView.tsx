@@ -10,6 +10,17 @@ import mpStyles from '../map/MapPanel.module.css'
 
 interface Props { data: AppData | null }
 
+// Hit-test result for hover/click on profile canvas
+interface HitResult {
+  type: 'mano'
+  id: string
+  name: string
+  ch: number
+  pressure: number   // bar
+  x: number          // canvas CSS px
+  y: number
+}
+
 export function ProfileView({ data }: Props) {
   const profChannel       = useStore(s => s.profChannel)
   const updateProfChannel = useStore(s => s.updateProfChannel)
@@ -18,6 +29,7 @@ export function ProfileView({ data }: Props) {
   const currentTs         = useStore(s => s.currentTs)
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const theme             = useStore(s => s.theme)
+  const setSelectedSensor = useStore(s => s.setSelectedSensor)
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const wrapRef    = useRef<HTMLDivElement>(null)
@@ -25,8 +37,9 @@ export function ProfileView({ data }: Props) {
   const isDragging = useRef(false)
   const dragStart  = useRef({ x: 0, chMin: 0, chMax: 0 })
 
-  const [vExag, setVExag]       = useState(1)
+  const [vExag, setVExag]         = useState(1)
   const [scaleOpen, setScaleOpen] = useState(false)
+  const [tooltip, setTooltip]     = useState<HitResult | null>(null)
 
   const paramDef = PARAMS[profChannel.param] ?? PARAMS.fpi
 
@@ -42,10 +55,14 @@ export function ProfileView({ data }: Props) {
     const canvas = canvasRef.current
     if (!canvas || !data?.profile.length) return
     const wrap = wrapRef.current!
-    canvas.width  = wrap.clientWidth
-    canvas.height = wrap.clientHeight
+    const dpr = window.devicePixelRatio || 1
+    const cssW = wrap.clientWidth
+    const cssH = wrap.clientHeight
+    canvas.width  = cssW * dpr
+    canvas.height = cssH * dpr
     const ctx = canvas.getContext('2d')!
-    const W = canvas.width, H = canvas.height
+    ctx.scale(dpr, dpr)
+    const W = cssW, H = cssH
     if (W < 10 || H < 10) return
 
     const PL=64, PR=24, PT=32, PB=44
@@ -237,6 +254,50 @@ export function ProfileView({ data }: Props) {
     }
   }, [data, currentTs, profChannel, profLayers, vExag, theme, paramDef])
 
+  // ── Hit test: find manometer dot near a CSS pixel position ────────────────
+  function hitTestMano(cssX: number, cssY: number): HitResult | null {
+    if (!data || !profLayers.mano || !canvasRef.current) return null
+    const canvas = canvasRef.current
+    const rect   = canvas.getBoundingClientRect()
+    const W = rect.width, H = rect.height
+    const PL=64, PR=24, PT=32, PB=44
+    const PW=W-PL-PR, PH=H-PT-PB
+    const { chMin, chMax, eMin, eMax } = viewRef.current
+    const ve   = vExag
+    const scaleH = PW / (chMax - chMin)
+    const scaleV = scaleH * ve
+    const usedH  = (eMax - eMin) * scaleV
+    const offY   = (PH - usedH) / 2
+    const cx = (ch: number) => PL + (ch - chMin) * scaleH
+    const cy = (el: number) => PT + offY + (eMax - el) * scaleV
+
+    const visTbm = data.tbm.filter(t => t.ts <= currentTs)
+    const tbmCh  = visTbm.length ? visTbm[visTbm.length - 1].ch : -Infinity
+
+    let best: HitResult | null = null
+    let bestDist = 16  // px hit radius
+
+    for (const m of data.manometers) {
+      if (m.ch > tbmCh) continue
+      if (m.ch < chMin - 50 || m.ch > chMax + 50) continue
+      const recent = m.series.filter(s => s[0] <= currentTs).at(-1)
+      if (!recent) continue
+      const pressure = recent[1]
+      const rawPElev = m.elev + pressure * 10.2
+      let surfaceElev = rawPElev
+      for (const p of data.profile) { if (p.ch >= m.ch) { surfaceElev = p.surfaceElev; break } }
+      const pElev = Math.min(rawPElev, surfaceElev)
+      const dx = cssX - cx(m.ch)
+      const dy = cssY - cy(pElev)
+      const dist = Math.sqrt(dx*dx + dy*dy)
+      if (dist < bestDist) {
+        bestDist = dist
+        best = { type: 'mano', id: m.id, name: m.name, ch: m.ch, pressure, x: cx(m.ch), y: cy(pElev) }
+      }
+    }
+    return best
+  }
+
   useEffect(() => {
     const ro = new ResizeObserver(() => draw())
     if (wrapRef.current) ro.observe(wrapRef.current)
@@ -267,14 +328,26 @@ export function ProfileView({ data }: Props) {
   }
 
   function onMouseDown(e: React.MouseEvent) {
+    setTooltip(null)
     isDragging.current = true
     dragStart.current = { x: e.clientX, chMin: viewRef.current.chMin, chMax: viewRef.current.chMax }
   }
 
   function onMouseMove(e: React.MouseEvent) {
-    if (!isDragging.current || !canvasRef.current) return
+    if (!canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const relX = e.clientX - rect.left
+    const relY = e.clientY - rect.top
+
+    // Update tooltip on hover (only when not dragging)
+    if (!isDragging.current) {
+      const hit = hitTestMano(relX, relY)
+      setTooltip(hit)
+    }
+
+    if (!isDragging.current) return
     const v = viewRef.current
-    const PW = canvasRef.current.width - 64 - 24
+    const PW = canvasRef.current.width / (window.devicePixelRatio || 1) - 64 - 24
     const scale = (v.chMax - v.chMin) / PW
     const dx = (e.clientX - dragStart.current.x) * scale
     viewRef.current = { ...v, chMin: dragStart.current.chMin - dx, chMax: dragStart.current.chMax - dx }
@@ -283,10 +356,18 @@ export function ProfileView({ data }: Props) {
 
   function onMouseUp() { isDragging.current = false }
 
+  function onCanvasClick(e: React.MouseEvent) {
+    if (!canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const hit = hitTestMano(e.clientX - rect.left, e.clientY - rect.top)
+    if (hit) setSelectedSensor({ type: 'manometer', id: hit.id })
+  }
+
+  // ── Touch handlers — attached only to the canvas element ─────────────────
   const touchStartRef = useRef<{ x: number; chMin: number; chMax: number; dist: number } | null>(null)
 
   useEffect(() => {
-    const el = wrapRef.current; if (!el) return
+    const el = canvasRef.current; if (!el) return
     function touchDist(e: TouchEvent) {
       if (e.touches.length < 2) return 0
       const dx = e.touches[0].clientX - e.touches[1].clientX
@@ -304,7 +385,8 @@ export function ProfileView({ data }: Props) {
       e.preventDefault()
       const ts = touchStartRef.current; if (!ts || !canvasRef.current) return
       const v = viewRef.current
-      const PW = canvasRef.current.width - 64 - 24
+      const rect = canvasRef.current.getBoundingClientRect()
+      const PW = rect.width - 64 - 24
       if (e.touches.length === 1) {
         const scale = (ts.chMax - ts.chMin) / PW
         const dx = (e.touches[0].clientX - ts.x) * scale
@@ -319,7 +401,21 @@ export function ProfileView({ data }: Props) {
       }
       draw()
     }
-    function onTouchEnd(e: TouchEvent) { e.preventDefault(); if (!e.touches.length) touchStartRef.current = null }
+    function onTouchEnd(e: TouchEvent) {
+      e.preventDefault()
+      if (e.touches.length === 0) {
+        // Tap — check for mano hit
+        if (e.changedTouches.length > 0 && canvasRef.current) {
+          const rect = canvasRef.current.getBoundingClientRect()
+          const hit = hitTestMano(
+            e.changedTouches[0].clientX - rect.left,
+            e.changedTouches[0].clientY - rect.top,
+          )
+          if (hit) setSelectedSensor({ type: 'manometer', id: hit.id })
+        }
+        touchStartRef.current = null
+      }
+    }
     el.addEventListener('touchstart', onTouchStart, { passive: false })
     el.addEventListener('touchmove',  onTouchMove,  { passive: false })
     el.addEventListener('touchend',   onTouchEnd,   { passive: false })
@@ -488,9 +584,22 @@ export function ProfileView({ data }: Props) {
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
+        onMouseLeave={() => { isDragging.current = false; setTooltip(null) }}
+        onClick={onCanvasClick}
       >
-        <canvas ref={canvasRef} style={{ display:'block', cursor:'crosshair', width:'100%', height:'100%' }} />
+        <canvas
+          ref={canvasRef}
+          style={{ display:'block', cursor: tooltip ? 'pointer' : 'crosshair', width:'100%', height:'100%' }}
+        />
+
+        {/* Hover tooltip for manometers */}
+        {tooltip && (
+          <div className={styles.profileTooltip} style={{ left: tooltip.x + 10, top: Math.max(8, tooltip.y - 36) }}>
+            <div className={styles.ttName}>{tooltip.name || tooltip.id}</div>
+            <div className={styles.ttVal}>{tooltip.pressure.toFixed(2)} bar · CH {tooltip.ch.toFixed(0)} m</div>
+            <div className={styles.ttHint}>Click to open chart</div>
+          </div>
+        )}
 
         {/* Vertical exaggeration slider */}
         <div className={styles.vExagWrap}>
@@ -499,7 +608,7 @@ export function ProfileView({ data }: Props) {
             type="range"
             min={1} max={20} step={0.5}
             value={vExag}
-            onChange={e => setVExag(Number(e.target.value))}
+            onChange={e => { const v = Number(e.target.value); setVExag(v); draw(v) }}
             className={styles.vExagSlider}
             title={`Vertical exaggeration: ${vExag}×`}
           />

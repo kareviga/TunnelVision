@@ -94,6 +94,34 @@
   overflow: hidden;
 }
 
+/* ── Profile canvas tooltip ───────────────────────────────────────────────── */
+.profileTooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-family: var(--mono);
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  z-index: 10;
+  white-space: nowrap;
+}
+.ttName {
+  font-size: 11px;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.ttVal {
+  font-size: 10px;
+  color: #60a5fa;
+}
+.ttHint {
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 3px;
+}
+
 /* ── Vertical exaggeration slider ─────────────────────────────────────────── */
 .vExagWrap {
   position: absolute;
@@ -151,7 +179,7 @@
     border-radius: 6px;
     padding: 5px 10px;
     gap: 8px;
-    pointer-events: none;
+    pointer-events: all;
   }
 
   .vExagSlider {
