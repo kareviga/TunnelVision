@@ -474,17 +474,20 @@ export function SensorChart({ data }: Props) {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const dpr = window.devicePixelRatio || 1
-    const rect = canvas.getBoundingClientRect()
-    canvas.width  = rect.width * dpr
-    canvas.height = rect.height * dpr
+    const dpr  = window.devicePixelRatio || 1
+    const wrap = canvasWrapRef.current
+    const cssW = wrap ? wrap.clientWidth  : canvas.getBoundingClientRect().width
+    const cssH = wrap ? wrap.clientHeight : canvas.getBoundingClientRect().height
+    if (cssW < 10 || cssH < 10) return
+    canvas.width  = cssW * dpr
+    canvas.height = cssH * dpr
     ctx.scale(dpr, dpr)
     const mode = annotModeRef.current
     const hoverPt = hover !== undefined ? hover
       : (hoverRef.current && mode ? { ...hoverRef.current, color: ANNOT_COLORS[mode] } : null)
     const ch = crosshair !== undefined ? crosshair : crosshairRef.current
     drawChart(
-      ctx, rect.width, rect.height,
+      ctx, cssW, cssH,
       valueSeries, distSeries, valueLabel, valueUnit,
       currentTs, viewRef.current, getChartColors(), annotation, hoverPt, ch,
     )
@@ -613,11 +616,14 @@ export function SensorChart({ data }: Props) {
           const canvas = canvasRef.current; if (!canvas) return
           const ctx = canvas.getContext('2d'); if (!ctx) return
           const dpr = window.devicePixelRatio || 1
-          canvas.width  = rect.width * dpr
-          canvas.height = rect.height * dpr
+          const wrap2 = canvasWrapRef.current
+          const iW = wrap2 ? wrap2.clientWidth  : rect.width
+          const iH = wrap2 ? wrap2.clientHeight : rect.height
+          canvas.width  = iW * dpr
+          canvas.height = iH * dpr
           ctx.scale(dpr, dpr)
           drawChart(
-            ctx, rect.width, rect.height,
+            ctx, iW, iH,
             valueSeriesRef.current, distSeries, valueLabel, valueUnit,
             currentTs, viewRef.current, getChartColors(), annotation,
             { ts: pt[0], val: pt[1], color: ANNOT_COLORS[mode] },
@@ -651,11 +657,14 @@ export function SensorChart({ data }: Props) {
       const canvas = canvasRef.current; if (!canvas) return
       const ctx = canvas.getContext('2d'); if (!ctx) return
       const dpr = window.devicePixelRatio || 1
-      canvas.width  = rect.width * dpr
-      canvas.height = rect.height * dpr
+      const wrap3 = canvasWrapRef.current
+      const tW = wrap3 ? wrap3.clientWidth  : rect.width
+      const tH = wrap3 ? wrap3.clientHeight : rect.height
+      canvas.width  = tW * dpr
+      canvas.height = tH * dpr
       ctx.scale(dpr, dpr)
       drawChart(
-        ctx, rect.width, rect.height,
+        ctx, tW, tH,
         valueSeriesRef.current, distSeries, valueLabel, valueUnit,
         currentTs, viewRef.current, getChartColors(), annotation, null,
       )
