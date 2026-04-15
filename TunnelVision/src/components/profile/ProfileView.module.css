@@ -1,97 +1,31 @@
-.profileWrap {
+/* ── Outer container ──────────────────────────────────────────────────────── */
+.profileView {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
-}
-
-.profileHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 12px;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.headerLbl {
-  font-family: var(--cond);
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--text3);
-}
-
-.paramBtn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 5px 8px;
-  font-size: 11px;
-  color: var(--text2);
-  cursor: pointer;
-  transition: all .15s;
-  font-family: var(--sans);
-}
-.paramBtn:hover { border-color: var(--border2); color: var(--text); }
-.paramBtn.active { border-color: var(--accent2); color: var(--text); background: rgba(0,136,170,.1); }
-
-.dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
-
-.layerItem {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.profToggle {
-  width: 24px; height: 13px;
-  background: var(--border2);
-  border-radius: 7px;
   position: relative;
-  cursor: pointer;
-  transition: background .2s;
-  flex-shrink: 0;
-}
-.profToggle.on { background: var(--accent2); }
-.profToggle::after {
-  content: '';
-  position: absolute;
-  width: 9px; height: 9px; background: white;
-  border-radius: 50%; top: 2px; left: 2px; transition: transform .2s;
-}
-.profToggle.on::after { transform: translateX(11px); }
-
-.layerLbl { font-size: 11px; color: var(--text2); }
-
-.cursorInfo {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text3);
 }
 
-.scalePanel {
-  background: var(--bg3);
-  border-bottom: 1px solid var(--border);
-  padding: 8px 14px;
-  flex-shrink: 0;
+.workspace {
+  flex: 1;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: flex-start;
+  overflow: hidden;
+  min-height: 0;
 }
 
+/* ── Panel (desktop: inline left sidebar) ─────────────────────────────────── */
+.panelOverlay {
+  /* desktop: always visible inline */
+  flex-shrink: 0;
+}
+
+/* ── Canvas area ──────────────────────────────────────────────────────────── */
 .canvasWrap {
   flex: 1;
   position: relative;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* ── Profile canvas tooltip ───────────────────────────────────────────────── */
@@ -107,20 +41,9 @@
   z-index: 10;
   white-space: nowrap;
 }
-.ttName {
-  font-size: 11px;
-  color: var(--text);
-  margin-bottom: 2px;
-}
-.ttVal {
-  font-size: 10px;
-  color: #60a5fa;
-}
-.ttHint {
-  font-size: 9px;
-  color: var(--text3);
-  margin-top: 3px;
-}
+.ttName { font-size: 11px; color: var(--text); margin-bottom: 2px; }
+.ttVal  { font-size: 10px; color: #60a5fa; }
+.ttHint { font-size: 9px; color: var(--text3); margin-top: 3px; }
 
 /* ── Vertical exaggeration slider ─────────────────────────────────────────── */
 .vExagWrap {
@@ -165,7 +88,51 @@
   pointer-events: all;
 }
 
+/* ── Mobile panel toggle button ───────────────────────────────────────────── */
+.panelToggle { display: none; }
+.backdrop    { display: none; }
+
+/* ── Mobile ───────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
+  .backdrop { display: block; }
+
+  .panelToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 600;
+    width: 36px;
+    height: 36px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 16px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+
+  .panelOpen .panelToggle {
+    left: calc(252px + 10px);
+  }
+
+  /* Panel slides in from left as overlay */
+  .panelOverlay {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    z-index: 550;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.6);
+  }
+
+  .panelOverlay.open {
+    transform: translateX(0);
+  }
+
   .vExagWrap {
     right: auto;
     left: 10px;

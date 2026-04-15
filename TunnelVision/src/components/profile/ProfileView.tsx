@@ -1,31 +1,28 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { formatCH } from '../../utils/format'
-import { valToColor, groutAttrColor, discreteRampCSS, rampCSS, FPI_RAMP, RAMP } from '../../utils/color'
-import { PARAMS, TBM_PARAMS, getDefaultClasses } from '../../data/params'
+import { valToColor, groutAttrColor } from '../../utils/color'
+import { PARAMS } from '../../data/params'
 import { TUNNEL_R } from '../../utils/geo'
-import type { AppData, DiscreteClass } from '../../types'
+import type { AppData } from '../../types'
+import { ProfilePanel } from './ProfilePanel'
 import styles from './ProfileView.module.css'
-import mpStyles from '../map/MapPanel.module.css'
 
 interface Props { data: AppData | null }
 
-// Hit-test result for hover/click on profile canvas
 interface HitResult {
   type: 'mano'
   id: string
   name: string
   ch: number
-  pressure: number   // bar
-  x: number          // canvas CSS px
+  pressure: number
+  x: number
   y: number
 }
 
 export function ProfileView({ data }: Props) {
   const profChannel       = useStore(s => s.profChannel)
-  const updateProfChannel = useStore(s => s.updateProfChannel)
   const profLayers        = useStore(s => s.profLayers)
-  const toggleProfLayer   = useStore(s => s.toggleProfLayer)
   const currentTs         = useStore(s => s.currentTs)
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const theme             = useStore(s => s.theme)
@@ -37,17 +34,11 @@ export function ProfileView({ data }: Props) {
   const isDragging = useRef(false)
   const dragStart  = useRef({ x: 0, chMin: 0, chMax: 0 })
 
-  const [vExag, setVExag]         = useState(1)
-  const [scaleOpen, setScaleOpen] = useState(false)
-  const [tooltip, setTooltip]     = useState<HitResult | null>(null)
+  const [vExag, setVExag]       = useState(1)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [tooltip, setTooltip]   = useState<HitResult | null>(null)
 
   const paramDef = PARAMS[profChannel.param] ?? PARAMS.fpi
-
-  function rampPreviewStyle() {
-    if (profChannel.discrete && profChannel.classes?.length) return discreteRampCSS(profChannel.classes)
-    if (profChannel.param === 'fpi') return rampCSS(FPI_RAMP, profChannel.inverted)
-    return rampCSS(RAMP, profChannel.inverted)
-  }
 
   // ── Draw ─────────────────────────────────────────────────────────────────
   const draw = useCallback((vExagOverride?: number) => {
@@ -55,7 +46,7 @@ export function ProfileView({ data }: Props) {
     const canvas = canvasRef.current
     if (!canvas || !data?.profile.length) return
     const wrap = wrapRef.current!
-    const dpr = window.devicePixelRatio || 1
+    const dpr  = window.devicePixelRatio || 1
     const cssW = wrap.clientWidth
     const cssH = wrap.clientHeight
     canvas.width  = cssW * dpr
@@ -79,13 +70,14 @@ export function ProfileView({ data }: Props) {
     const cx = (ch: number) => PL + (ch - chMin) * scaleH
     const cy = (el: number) => PT + offY + (eMax - el) * scaleV
 
-    // Background
-    const bgColor  = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()  || '#080a0e'
-    const bg2Color = getComputedStyle(document.documentElement).getPropertyValue('--bg2').trim() || '#0d1117'
+    const cs = getComputedStyle(document.documentElement)
+    const bgColor  = cs.getPropertyValue('--bg').trim()  || '#080a0e'
+    const bg2Color = cs.getPropertyValue('--bg2').trim() || '#0d1117'
+    const borderColor = cs.getPropertyValue('--border').trim() || '#151c28'
+
     ctx.fillStyle = bgColor
     ctx.fillRect(0, 0, W, H)
 
-    // Underground fill
     ctx.fillStyle = bg2Color
     ctx.beginPath()
     pts.forEach((p, i) => i===0 ? ctx.moveTo(cx(p.ch), cy(p.surfaceElev)) : ctx.lineTo(cx(p.ch), cy(p.surfaceElev)))
@@ -93,8 +85,6 @@ export function ProfileView({ data }: Props) {
     ctx.lineTo(cx(pts[0].ch), PT+PH)
     ctx.closePath(); ctx.fill()
 
-    // Grid
-    const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#151c28'
     ctx.strokeStyle = borderColor; ctx.lineWidth = 0.8
     const eStep = (eMax-eMin) > 150 ? 50 : 25
     for (let e = Math.ceil(eMin/eStep)*eStep; e <= eMax; e += eStep) {
@@ -112,7 +102,6 @@ export function ProfileView({ data }: Props) {
       ctx.fillText(formatCH(ch), x, PT+PH+14)
     }
 
-    // Sea level
     if (cy(0) > PT && cy(0) < PT+PH) {
       ctx.strokeStyle = 'rgba(30,80,180,0.35)'; ctx.lineWidth = 0.8; ctx.setLineDash([6,4])
       ctx.beginPath(); ctx.moveTo(PL, cy(0)); ctx.lineTo(PL+PW, cy(0)); ctx.stroke(); ctx.setLineDash([])
@@ -121,7 +110,6 @@ export function ProfileView({ data }: Props) {
     }
     ctx.setLineDash([])
 
-    // Soil layer
     if (profLayers.soil) {
       ctx.fillStyle = 'rgba(160,120,70,0.30)'
       ctx.beginPath()
@@ -140,26 +128,22 @@ export function ProfileView({ data }: Props) {
       ctx.stroke(); ctx.setLineDash([])
     }
 
-    // Rock layer
     if (profLayers.rock) {
-      const ROCK_BOT = -10
       ctx.fillStyle = 'rgba(90,110,140,0.28)'
       ctx.beginPath()
       pts.forEach((p,i) => {
         const sb = p.soilBaseElev != null ? Math.min(p.soilBaseElev, p.surfaceElev) : p.surfaceElev
         i===0 ? ctx.moveTo(cx(p.ch), cy(sb)) : ctx.lineTo(cx(p.ch), cy(sb))
       })
-      for (let i = pts.length-1; i >= 0; i--) ctx.lineTo(cx(pts[i].ch), cy(ROCK_BOT))
+      for (let i = pts.length-1; i >= 0; i--) ctx.lineTo(cx(pts[i].ch), cy(-10))
       ctx.closePath(); ctx.fill()
     }
 
-    // Surface line
     ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 1.8; ctx.setLineDash([])
     ctx.beginPath()
     pts.forEach((p,i) => i===0 ? ctx.moveTo(cx(p.ch), cy(p.surfaceElev)) : ctx.lineTo(cx(p.ch), cy(p.surfaceElev)))
     ctx.stroke()
 
-    // Grout screens
     if (profLayers.grout) {
       const fanRad = 8 * Math.PI / 180
       const vg = data.grout.filter(g => g.ts <= currentTs && g.ch >= chMin-50 && g.ch <= chMax+50)
@@ -183,7 +167,6 @@ export function ProfileView({ data }: Props) {
       }
     }
 
-    // TBM coloured band
     if (profChannel.param !== 'none') {
       const field = paramDef.field as string
       const visTBM = data.tbm.filter(t => t.ts <= currentTs && t.ch >= chMin-50 && t.ch <= chMax+50)
@@ -203,7 +186,6 @@ export function ProfileView({ data }: Props) {
       }
     }
 
-    // Manometers
     if (profLayers.mano) {
       const visTbm = data.tbm.filter(t => t.ts <= currentTs)
       const tbmCh  = visTbm.length ? visTbm[visTbm.length - 1].ch : -Infinity
@@ -224,7 +206,6 @@ export function ProfileView({ data }: Props) {
       }
     }
 
-    // TBM machine — drawn last (on top)
     const tbmAll = data.tbm.filter(t => t.ts <= currentTs)
     if (tbmAll.length) {
       const last = tbmAll[tbmAll.length - 1]
@@ -254,32 +235,25 @@ export function ProfileView({ data }: Props) {
     }
   }, [data, currentTs, profChannel, profLayers, vExag, theme, paramDef])
 
-  // ── Hit test: find manometer dot near a CSS pixel position ────────────────
+  // ── Hit test manometers ────────────────────────────────────────────────────
   function hitTestMano(cssX: number, cssY: number): HitResult | null {
     if (!data || !profLayers.mano || !canvasRef.current) return null
-    const canvas = canvasRef.current
-    const rect   = canvas.getBoundingClientRect()
+    const rect = canvasRef.current.getBoundingClientRect()
     const W = rect.width, H = rect.height
     const PL=64, PR=24, PT=32, PB=44
     const PW=W-PL-PR, PH=H-PT-PB
     const { chMin, chMax, eMin, eMax } = viewRef.current
-    const ve   = vExag
     const scaleH = PW / (chMax - chMin)
-    const scaleV = scaleH * ve
+    const scaleV = scaleH * vExag
     const usedH  = (eMax - eMin) * scaleV
     const offY   = (PH - usedH) / 2
     const cx = (ch: number) => PL + (ch - chMin) * scaleH
     const cy = (el: number) => PT + offY + (eMax - el) * scaleV
-
     const visTbm = data.tbm.filter(t => t.ts <= currentTs)
     const tbmCh  = visTbm.length ? visTbm[visTbm.length - 1].ch : -Infinity
-
-    let best: HitResult | null = null
-    let bestDist = 16  // px hit radius
-
+    let best: HitResult | null = null, bestDist = 16
     for (const m of data.manometers) {
-      if (m.ch > tbmCh) continue
-      if (m.ch < chMin - 50 || m.ch > chMax + 50) continue
+      if (m.ch > tbmCh || m.ch < chMin - 50 || m.ch > chMax + 50) continue
       const recent = m.series.filter(s => s[0] <= currentTs).at(-1)
       if (!recent) continue
       const pressure = recent[1]
@@ -287,13 +261,9 @@ export function ProfileView({ data }: Props) {
       let surfaceElev = rawPElev
       for (const p of data.profile) { if (p.ch >= m.ch) { surfaceElev = p.surfaceElev; break } }
       const pElev = Math.min(rawPElev, surfaceElev)
-      const dx = cssX - cx(m.ch)
-      const dy = cssY - cy(pElev)
+      const dx = cssX - cx(m.ch), dy = cssY - cy(pElev)
       const dist = Math.sqrt(dx*dx + dy*dy)
-      if (dist < bestDist) {
-        bestDist = dist
-        best = { type: 'mano', id: m.id, name: m.name, ch: m.ch, pressure, x: cx(m.ch), y: cy(pElev) }
-      }
+      if (dist < bestDist) { bestDist = dist; best = { type:'mano', id:m.id, name:m.name, ch:m.ch, pressure, x:cx(m.ch), y:cy(pElev) } }
     }
     return best
   }
@@ -311,8 +281,7 @@ export function ProfileView({ data }: Props) {
     const vis  = data.tbm.filter(t => t.ts <= currentTs)
     const last = vis.length ? vis[vis.length - 1] : data.tbm[0]
     if (!last) return
-    const v = viewRef.current
-    viewRef.current = { ...v, chMin: last.ch - 400, chMax: last.ch + 400 }
+    viewRef.current = { ...viewRef.current, chMin: last.ch - 400, chMax: last.ch + 400 }
     draw()
   }, [zoomToTBMTick])
 
@@ -328,23 +297,15 @@ export function ProfileView({ data }: Props) {
   }
 
   function onMouseDown(e: React.MouseEvent) {
-    setTooltip(null)
-    isDragging.current = true
+    setTooltip(null); isDragging.current = true
     dragStart.current = { x: e.clientX, chMin: viewRef.current.chMin, chMax: viewRef.current.chMax }
   }
 
   function onMouseMove(e: React.MouseEvent) {
     if (!canvasRef.current) return
     const rect = canvasRef.current.getBoundingClientRect()
-    const relX = e.clientX - rect.left
-    const relY = e.clientY - rect.top
-
-    // Update tooltip on hover (only when not dragging)
-    if (!isDragging.current) {
-      const hit = hitTestMano(relX, relY)
-      setTooltip(hit)
-    }
-
+    const relX = e.clientX - rect.left, relY = e.clientY - rect.top
+    if (!isDragging.current) setTooltip(hitTestMano(relX, relY))
     if (!isDragging.current) return
     const v = viewRef.current
     const PW = canvasRef.current.width / (window.devicePixelRatio || 1) - 64 - 24
@@ -363,7 +324,6 @@ export function ProfileView({ data }: Props) {
     if (hit) setSelectedSensor({ type: 'manometer', id: hit.id })
   }
 
-  // ── Touch handlers — attached only to the canvas element ─────────────────
   const touchStartRef = useRef<{ x: number; chMin: number; chMax: number; dist: number } | null>(null)
 
   useEffect(() => {
@@ -404,13 +364,9 @@ export function ProfileView({ data }: Props) {
     function onTouchEnd(e: TouchEvent) {
       e.preventDefault()
       if (e.touches.length === 0) {
-        // Tap — check for mano hit
         if (e.changedTouches.length > 0 && canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect()
-          const hit = hitTestMano(
-            e.changedTouches[0].clientX - rect.left,
-            e.changedTouches[0].clientY - rect.top,
-          )
+          const hit = hitTestMano(e.changedTouches[0].clientX - rect.left, e.changedTouches[0].clientY - rect.top)
           if (hit) setSelectedSensor({ type: 'manometer', id: hit.id })
         }
         touchStartRef.current = null
@@ -438,183 +394,70 @@ export function ProfileView({ data }: Props) {
     }
   }, [data])
 
-  // TBM params excluding 'none'
-  const paramKeys = TBM_PARAMS.filter(k => k !== 'none')
-
   return (
-    <div className={styles.profileWrap}>
-      {/* Header */}
-      <div className={styles.profileHeader}>
+    <div className={`${styles.profileView} ${panelOpen ? styles.panelOpen : ''}`}>
+      <div className={styles.workspace}>
 
-        {/* Parameter dropdown + ramp */}
-        <span className={styles.headerLbl}>PARAMETER</span>
-        <select
-          className={mpStyles.paramSelect}
-          style={{ width: 130, marginBottom: 0 }}
-          value={profChannel.param}
-          onChange={e => updateProfChannel({ param: e.target.value })}
-        >
-          {paramKeys.map(k => {
-            const p = PARAMS[k]
-            return <option key={k} value={k}>{p.label}{p.unit ? ` (${p.unit})` : ''}</option>
-          })}
-        </select>
-
-        {/* Ramp preview button */}
-        <button
-          className={`${mpStyles.rampBtn} ${scaleOpen ? mpStyles.rampBtnOpen : ''}`}
-          style={{ width: 100 }}
-          onClick={() => setScaleOpen(o => !o)}
-          title="Edit colour scale"
-        >
-          <div className={mpStyles.rampPreview} style={{ background: rampPreviewStyle() }} />
-          <span className={mpStyles.rampChevron}>{scaleOpen ? '▴' : '▾'}</span>
-        </button>
-
-        {/* Layers */}
-        <div style={{ marginLeft:12, display:'flex', gap:8, alignItems:'center' }}>
-          <span className={styles.headerLbl}>LAYERS</span>
-          {(['grout','mano','soil','rock'] as const).map(k => (
-            <div key={k} className={styles.layerItem} onClick={() => toggleProfLayer(k)}>
-              <div className={`${styles.profToggle} ${profLayers[k] ? styles.on : ''}`} />
-              <span className={styles.layerLbl}>{k === 'mano' ? 'Mano' : k.charAt(0).toUpperCase()+k.slice(1)}</span>
-            </div>
-          ))}
+        {/* Left panel — desktop inline, mobile overlay */}
+        <div className={`${styles.panelOverlay} ${panelOpen ? styles.open : ''}`}>
+          <ProfilePanel />
         </div>
 
-        <div className={styles.cursorInfo}>Scroll/pinch to zoom · Drag to pan</div>
+        {/* Canvas area */}
+        <div
+          ref={wrapRef}
+          className={styles.canvasWrap}
+          onWheel={onWheel}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={() => { isDragging.current = false; setTooltip(null) }}
+          onClick={onCanvasClick}
+        >
+          <canvas
+            ref={canvasRef}
+            style={{ display:'block', cursor: tooltip ? 'pointer' : 'crosshair', width:'100%', height:'100%' }}
+          />
+
+          {tooltip && (
+            <div className={styles.profileTooltip} style={{ left: tooltip.x + 10, top: Math.max(8, tooltip.y - 36) }}>
+              <div className={styles.ttName}>{tooltip.name || tooltip.id}</div>
+              <div className={styles.ttVal}>{tooltip.pressure.toFixed(2)} bar · CH {tooltip.ch.toFixed(0)} m</div>
+              <div className={styles.ttHint}>Click to open chart</div>
+            </div>
+          )}
+
+          {/* Vertical exaggeration slider */}
+          <div className={styles.vExagWrap}>
+            <span className={styles.vExagLbl}>{vExag}×</span>
+            <input
+              type="range" min={1} max={20} step={0.5} value={vExag}
+              onChange={e => { const v = Number(e.target.value); setVExag(v); draw(v) }}
+              className={styles.vExagSlider}
+              title={`Vertical exaggeration: ${vExag}×`}
+            />
+            <span className={styles.vExagTag}>V.EXAG</span>
+          </div>
+        </div>
       </div>
 
-      {/* Scale editor panel — shown below header */}
-      {scaleOpen && (
-        <div className={styles.scalePanel}>
-          {/* Mode */}
-          <div className={mpStyles.scaleEditorRow}>
-            <span className={mpStyles.scaleLbl}>Mode</span>
-            <button
-              className={`${mpStyles.modeBtn} ${profChannel.discrete ? mpStyles.on : ''}`}
-              onClick={() => {
-                const next = !profChannel.discrete
-                updateProfChannel({
-                  discrete: next,
-                  classes: next && !profChannel.classes?.length ? getDefaultClasses(profChannel.param) : profChannel.classes,
-                })
-              }}
-            >DISCRETE</button>
-          </div>
-
-          {/* Continuous min/max */}
-          {!profChannel.discrete && (
-            <div className={mpStyles.scaleRow}>
-              <span className={mpStyles.scaleLbl}>Min</span>
-              <input className={mpStyles.scaleInp} type="number" step="any" value={profChannel.scaleMin}
-                onChange={e => updateProfChannel({ scaleMin: parseFloat(e.target.value) || 0 })} />
-              <span className={mpStyles.scaleLbl}>Max</span>
-              <input className={mpStyles.scaleInp} type="number" step="any" value={profChannel.scaleMax}
-                onChange={e => updateProfChannel({ scaleMax: parseFloat(e.target.value) || 1 })} />
-              <button className={mpStyles.autoBtn}
-                onClick={() => updateProfChannel({ scaleMin: paramDef.min, scaleMax: paramDef.max, inverted: false })}>
-                AUTO
-              </button>
-            </div>
-          )}
-
-          {/* Discrete class editor */}
-          {profChannel.discrete && (
-            <div className={mpStyles.classEditor}>
-              <div className={mpStyles.classHeader}>
-                <span style={{width:44}}>From</span>
-                <span style={{width:44}}>To</span>
-                <span style={{width:22}}>Col</span>
-              </div>
-              {(profChannel.classes ?? []).map((cls, i) => {
-                const isLast = i === (profChannel.classes?.length ?? 0) - 1
-                return (
-                  <div key={i} className={mpStyles.classRow}>
-                    <input className={mpStyles.classFrom} type="number" step="any" value={cls.from}
-                      onChange={e => {
-                        const next = [...(profChannel.classes ?? [])]
-                        next[i] = { ...cls, from: parseFloat(e.target.value) || 0 }
-                        updateProfChannel({ classes: next })
-                      }} />
-                    <input className={mpStyles.classTo} type="number" step="any"
-                      value={isLast ? '' : cls.to} disabled={isLast}
-                      style={isLast ? { opacity: 0.4 } : {}}
-                      onChange={e => {
-                        const next = [...(profChannel.classes ?? [])]
-                        next[i] = { ...cls, to: parseFloat(e.target.value) || 0 }
-                        updateProfChannel({ classes: next })
-                      }} />
-                    <input className={mpStyles.classColor} type="color" value={cls.color}
-                      onChange={e => {
-                        const next = [...(profChannel.classes ?? [])]
-                        next[i] = { ...cls, color: e.target.value }
-                        updateProfChannel({ classes: next })
-                      }} />
-                    <button className={mpStyles.classDel}
-                      onClick={() => {
-                        if ((profChannel.classes?.length ?? 0) <= 1) return
-                        const next = (profChannel.classes ?? []).filter((_, j) => j !== i)
-                        next[next.length-1] = { ...next[next.length-1], to: Infinity }
-                        updateProfChannel({ classes: next })
-                      }}>×</button>
-                  </div>
-                )
-              })}
-              <button className={mpStyles.addClassBtn}
-                onClick={() => {
-                  const cls = profChannel.classes ?? []
-                  const last = cls[cls.length-1]
-                  const newFrom = last ? (isFinite(last.to) ? last.to : last.from + 10) : 0
-                  const next: DiscreteClass[] = [...cls]
-                  if (last) next[next.length-1] = { ...last, to: newFrom }
-                  next.push({ from: newFrom, to: Infinity, color: '#3b82f6' })
-                  updateProfChannel({ classes: next })
-                }}>+ Add class</button>
-            </div>
-          )}
-        </div>
+      {/* Tap-outside backdrop (mobile only) */}
+      {panelOpen && (
+        <div
+          className={styles.backdrop}
+          onClick={() => setPanelOpen(false)}
+          style={{ position:'absolute', inset:0, zIndex:540, background:'rgba(0,0,0,0.45)' }}
+        />
       )}
 
-      {/* Canvas */}
-      <div
-        ref={wrapRef}
-        className={styles.canvasWrap}
-        onWheel={onWheel}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={() => { isDragging.current = false; setTooltip(null) }}
-        onClick={onCanvasClick}
+      {/* Mobile panel toggle */}
+      <button
+        className={styles.panelToggle}
+        onClick={() => setPanelOpen(o => !o)}
+        aria-label="Toggle panel"
       >
-        <canvas
-          ref={canvasRef}
-          style={{ display:'block', cursor: tooltip ? 'pointer' : 'crosshair', width:'100%', height:'100%' }}
-        />
-
-        {/* Hover tooltip for manometers */}
-        {tooltip && (
-          <div className={styles.profileTooltip} style={{ left: tooltip.x + 10, top: Math.max(8, tooltip.y - 36) }}>
-            <div className={styles.ttName}>{tooltip.name || tooltip.id}</div>
-            <div className={styles.ttVal}>{tooltip.pressure.toFixed(2)} bar · CH {tooltip.ch.toFixed(0)} m</div>
-            <div className={styles.ttHint}>Click to open chart</div>
-          </div>
-        )}
-
-        {/* Vertical exaggeration slider */}
-        <div className={styles.vExagWrap}>
-          <span className={styles.vExagLbl}>{vExag}×</span>
-          <input
-            type="range"
-            min={1} max={20} step={0.5}
-            value={vExag}
-            onChange={e => { const v = Number(e.target.value); setVExag(v); draw(v) }}
-            className={styles.vExagSlider}
-            title={`Vertical exaggeration: ${vExag}×`}
-          />
-          <span className={styles.vExagTag}>V.EXAG</span>
-        </div>
-      </div>
+        {panelOpen ? '✕' : '☰'}
+      </button>
     </div>
   )
 }

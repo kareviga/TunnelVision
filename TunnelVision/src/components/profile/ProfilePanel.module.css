@@ -1,0 +1,33 @@
+.layerList { list-style: none; padding: 0; margin: 0; }
+
+.layerItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background .1s;
+}
+.layerItem:hover { background: rgba(255,255,255,.04); }
+
+.toggle {
+  width: 28px; height: 15px;
+  background: var(--border2);
+  border-radius: 8px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--accent2); }
+.toggle::after {
+  content: ''; position: absolute;
+  width: 11px; height: 11px; background: white;
+  border-radius: 50%; top: 2px; left: 2px; transition: transform .2s;
+}
+.toggle.on::after { transform: translateX(13px); }
+
+.swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.layerLbl { font-size: 11px; color: var(--text2); }
+.layerItem:has(.toggle.on) .layerLbl { color: var(--text); }
