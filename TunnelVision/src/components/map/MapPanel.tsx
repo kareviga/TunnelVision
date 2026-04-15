@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useStore } from '../../store/useStore'
-import { PARAMS, TBM_PARAMS, XRF_PARAMS, getDefaultClasses, GROUT_PARAMS, GROUT_PARAM_KEYS } from '../../data/params'
+import { PARAMS, TBM_PARAMS, XRF_PARAMS, getDefaultClasses, GROUT_PARAMS, GROUT_PARAM_KEYS, RING_TYPE_COLORS } from '../../data/params'
 import { discreteRampCSS, rampCSS, FPI_RAMP, RAMP } from '../../utils/color'
 import type { AppData, LayerKey, DiscreteClass } from '../../types'
 import styles from './MapPanel.module.css'
@@ -192,20 +192,23 @@ export function MapPanel({ data: _data }: Props) {
               <li key={key} className={`${styles.layerItem} ${layerVis[key] ? styles.active : ''}`}
                 draggable onDragStart={() => onDragStart(key)} onDragEnter={() => onDragEnter(key)}
                 onDragEnd={onDragEnd} onDragOver={e => e.preventDefault()}>
-                <span className={styles.dragHandle}>⠿</span>
-                {/* Edit button — leftmost after drag handle */}
-                <button
-                  className={`${styles.layerEditBtn} ${isEditing ? styles.layerEditBtnActive : ''}`}
-                  onClick={e => { e.stopPropagation(); setLayerEdit(isEditing ? null : key) }}
-                  title="Edit layer style"
-                >✎</button>
-                <div className={`${styles.toggle} ${layerVis[key] ? styles.on : ''}`} onClick={() => toggleLayer(key)} />
-                <button className={styles.layerRowBtn} onClick={() => toggleLayer(key)}>
-                  <div className={styles.layerSwatch} style={{ background: l.color }} />
-                  <div className={styles.layerLabel}>{l.label}</div>
-                </button>
 
-                {/* Inline editor */}
+                {/* Main row — everything on one line */}
+                <div className={styles.layerRow}>
+                  <span className={styles.dragHandle}>⠿</span>
+                  <button
+                    className={`${styles.layerEditBtn} ${isEditing ? styles.layerEditBtnActive : ''}`}
+                    onClick={e => { e.stopPropagation(); setLayerEdit(isEditing ? null : key) }}
+                    title="Edit layer style"
+                  >✎</button>
+                  <div className={`${styles.toggle} ${layerVis[key] ? styles.on : ''}`} onClick={() => toggleLayer(key)} />
+                  <button className={styles.layerRowBtn} onClick={() => toggleLayer(key)}>
+                    <div className={styles.layerSwatch} style={{ background: l.color }} />
+                    <div className={styles.layerLabel}>{l.label}</div>
+                  </button>
+                </div>
+
+                {/* Inline editor — full width below the row */}
                 {isEditing && (
                   <div className={styles.layerEditor}>
                     {/* Opacity */}
@@ -215,15 +218,39 @@ export function MapPanel({ data: _data }: Props) {
                         onChange={e => updateLayerStyle(key, { opacity: parseInt(e.target.value) / 100 })} />
                       <span className={styles.leVal}>{Math.round(ls.opacity * 100)}%</span>
                     </div>
-                    {/* Color override — all layers */}
-                    <div className={styles.leRow}>
-                      <span className={styles.leLbl}>Color</span>
-                      <input type="color" value={ls.color ?? l.defaultColor}
-                        onChange={e => updateLayerStyle(key, { color: e.target.value })}
-                        style={{ width: 36, height: 22, padding: 1, border: '1px solid var(--border2)', borderRadius: 3, cursor:'pointer', background:'none' }} />
-                      <button className={styles.autoBtn} style={{ fontSize: 8 }}
-                        onClick={() => updateLayerStyle(key, { color: undefined })}>RESET</button>
-                    </div>
+                    {/* Color override */}
+                    {key !== 'rings' && (
+                      <div className={styles.leRow}>
+                        <span className={styles.leLbl}>Color</span>
+                        <input type="color" value={ls.color ?? l.defaultColor}
+                          onChange={e => updateLayerStyle(key, { color: e.target.value })}
+                          style={{ width: 36, height: 22, padding: 1, border: '1px solid var(--border2)', borderRadius: 3, cursor:'pointer', background:'none' }} />
+                        <button className={styles.autoBtn} style={{ fontSize: 8 }}
+                          onClick={() => updateLayerStyle(key, { color: undefined })}>RESET</button>
+                      </div>
+                    )}
+                    {/* Per ring-type colors */}
+                    {key === 'rings' && (
+                      <div className={styles.ringTypeGrid}>
+                        {Object.entries(RING_TYPE_COLORS).map(([rt, defaultCol]) => (
+                          <div key={rt} className={styles.ringTypeRow}>
+                            <span className={styles.ringTypeLbl}>{rt}</span>
+                            <input type="color"
+                              value={ls.ringTypeColors?.[rt] ?? defaultCol}
+                              onChange={e => updateLayerStyle(key, {
+                                ringTypeColors: { ...(ls.ringTypeColors ?? {}), [rt]: e.target.value }
+                              })}
+                              style={{ width: 36, height: 22, padding: 1, border: '1px solid var(--border2)', borderRadius: 3, cursor:'pointer', background:'none' }} />
+                            <button className={styles.autoBtn} style={{ fontSize: 8 }}
+                              onClick={() => {
+                                const next = { ...(ls.ringTypeColors ?? {}) }
+                                delete next[rt]
+                                updateLayerStyle(key, { ringTypeColors: Object.keys(next).length ? next : undefined })
+                              }}>RESET</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {/* Attribute selector for grout */}
                     {l.hasAttr && (
                       <div className={styles.leRow}>

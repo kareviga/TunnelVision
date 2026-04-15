@@ -231,13 +231,14 @@ export function LeafletMap({ data }: Props) {
         if (d < bd) { bd = d; idx = j }
       }
       if (idx >= al.length - 1) continue
-      const color = RING_TYPE_COLORS[t.ringType] ?? '#22c55e'
+      const baseColor = layerStyles.rings.ringTypeColors?.[t.ringType] ?? RING_TYPE_COLORS[t.ringType] ?? '#22c55e'
+      const color = layerStyles.rings.color || baseColor
       L.polygon(
         [leftPts[idx], rightPts[idx], rightPts[idx+1], leftPts[idx+1]],
-        { pane:'ringsPane', color: '#000', weight: 0.5, fillColor: layerStyles.rings.color || color, fillOpacity: layerStyles.rings.opacity }
+        { pane:'ringsPane', color: '#000', weight: 0.5, fillColor: color, fillOpacity: layerStyles.rings.opacity }
       )
         .bindTooltip(
-          `<b style="color:${color}">Ring ${t.ring}</b><br/>` +
+          `<b style="color:${baseColor}">Ring ${t.ring}</b><br/>` +
           `${t.ringType}<br/>` +
           `CH ${t.ch.toFixed(0)} m<br/>` +
           `<span style="color:#7090a8;font-size:10px">${fmtDate(t.ts)}</span>`,

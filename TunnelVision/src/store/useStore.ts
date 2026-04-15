@@ -6,6 +6,7 @@ export interface LayerStyle {
   opacity: number    // 0–1 fill opacity
   color?: string     // optional color override (null = use default)
   attribute?: string // for grout: which attribute to color by
+  ringTypeColors?: Record<string, string> // for rings: per-type color overrides
 }
 
 export interface PiezAnnotation {
