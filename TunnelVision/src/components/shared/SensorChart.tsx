@@ -673,6 +673,25 @@ export function SensorChart({ data }: Props) {
 
   if (!selectedSensor) return null
 
+  // ── Export chart as PNG ────────────────────────────────────────────────────
+  function exportPNG() {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const fmt = (ts: number) => {
+      const d = new Date(ts * 1000)
+      return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+    }
+    const id = selectedSensor!.type === 'piezometer'
+      ? `PZ${selectedSensor!.id}`
+      : `MAN${selectedSensor!.id}`
+    const { min, max } = viewRef.current
+    const name = `${id}_${fmt(min)}_${fmt(max)}.png`
+    const a = document.createElement('a')
+    a.href = canvas.toDataURL('image/png')
+    a.download = name
+    a.click()
+  }
+
   const title = sensor
     ? isMano
       ? `${(sensor as ManometerSensor).name} (CH ${(sensor as ManometerSensor).ch.toFixed(0)}m)`
@@ -746,14 +765,25 @@ export function SensorChart({ data }: Props) {
               )}
             </div>
           </div>
-          <button
-            onClick={() => setSelectedSensor(null)}
-            style={{
-              background: 'transparent', border: '1px solid var(--border2)',
-              borderRadius: 3, color: 'var(--text3)', cursor: 'pointer',
-              fontSize: 16, lineHeight: 1, padding: '2px 8px', fontFamily: 'monospace',
-            }}
-          >×</button>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={exportPNG}
+              title="Export chart as PNG"
+              style={{
+                background: 'transparent', border: '1px solid var(--border2)',
+                borderRadius: 3, color: 'var(--text3)', cursor: 'pointer',
+                fontSize: 12, lineHeight: 1, padding: '2px 8px', fontFamily: 'monospace',
+              }}
+            >↓ PNG</button>
+            <button
+              onClick={() => setSelectedSensor(null)}
+              style={{
+                background: 'transparent', border: '1px solid var(--border2)',
+                borderRadius: 3, color: 'var(--text3)', cursor: 'pointer',
+                fontSize: 16, lineHeight: 1, padding: '2px 8px', fontFamily: 'monospace',
+              }}
+            >×</button>
+          </div>
         </div>
 
         {/* Canvas chart */}
