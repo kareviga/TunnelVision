@@ -387,6 +387,29 @@ export function SensorChart({ data }: Props) {
   const clearPiezAnnotation = useStore(s => s.clearPiezAnnotation)
   const theme               = useStore(s => s.theme)
   const canvasRef           = useRef<HTMLCanvasElement>(null)
+  const canvasWrapRef       = useRef<HTMLDivElement>(null)
+  const winRef              = useRef<HTMLDivElement>(null)
+
+  // ── Floating window position & drag ───────────────────────────────────────
+  const [pos, setPos] = useState(() => ({
+    x: Math.max(20, Math.round((window.innerWidth  - 680) / 2)),
+    y: Math.max(20, Math.round((window.innerHeight - 460) / 2)),
+  }))
+  const dragState = useRef<{ startX: number; startY: number; startLeft: number; startTop: number } | null>(null)
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragState.current) return
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth  - 200, dragState.current.startLeft + e.clientX - dragState.current.startX)),
+        y: Math.max(0, Math.min(window.innerHeight - 60,  dragState.current.startTop  + e.clientY - dragState.current.startY)),
+      })
+    }
+    function onUp() { dragState.current = null }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+  }, [])
 
   const [annotMode, setAnnotMode] = useState<AnnotMode>(null)
 
@@ -706,77 +729,99 @@ export function SensorChart({ data }: Props) {
   const recoveryCh = annotation?.recoveryTs ? chainageAtTs(annotation.recoveryTs, data.tbm) : null
   const affectedStretch = dropCh !== null && recoveryCh !== null ? recoveryCh - dropCh : null
 
+  // Observe canvas wrapper size and redraw on resize
+  useEffect(() => {
+    const el = canvasWrapRef.current; if (!el) return
+    const ro = new ResizeObserver(() => draw())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [draw])
+
   const canvasStyle: React.CSSProperties = {
-    width: '100%', height: 300, display: 'block', borderRadius: 3,
+    width: '100%', height: '100%', display: 'block', borderRadius: 3,
     cursor: annotMode ? 'crosshair' : 'grab',
   }
 
   return (
     <div
+      ref={winRef}
       style={{
-        position: 'fixed', inset: 0, zIndex: 3000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.65)',
-      }}
-      onClick={e => { if (e.target === e.currentTarget) setSelectedSensor(null) }}
-    >
-      <div style={{
+        position: 'fixed',
+        left: pos.x, top: pos.y,
+        width: 680, minWidth: 340, minHeight: 280,
+        zIndex: 3000,
         background: 'var(--bg2)', border: '1px solid var(--border)',
-        borderRadius: 6, padding: '16px 18px',
-        width: 'min(760px, 94vw)', boxShadow: '0 8px 32px rgba(0,0,0,.7)',
-        maxHeight: '90vh', overflowY: 'auto',
-      }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-          <div>
-            <div style={{ color: '#00d4ff', fontFamily: 'var(--cond)', fontSize: 15, fontWeight: 600, letterSpacing: 1 }}>
-              {title}
-            </div>
-            <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
-              {subtitle}
-            </div>
-            <div style={{ color: '#ef4444', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
-              ▌ {currentDateLabel}
-              {currentDist !== null && (
-                <span style={{ color: '#f59e0b', marginLeft: 8 }}>
-                  ⟷ {currentDist < 1000
-                    ? `${Math.round(currentDist)} m to TBM`
-                    : `${(currentDist / 1000).toFixed(1)} km to TBM`}
-                </span>
-              )}
-            </div>
+        borderRadius: 6, boxShadow: '0 8px 32px rgba(0,0,0,.7)',
+        display: 'flex', flexDirection: 'column',
+        resize: 'both', overflow: 'auto',
+      }}
+    >
+      {/* ── Drag handle / title bar ── */}
+      <div
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          padding: '10px 14px 8px', flexShrink: 0,
+          cursor: 'move', userSelect: 'none',
+          borderBottom: '1px solid var(--border)',
+        }}
+        onMouseDown={e => {
+          e.preventDefault()
+          dragState.current = { startX: e.clientX, startY: e.clientY, startLeft: pos.x, startTop: pos.y }
+        }}
+      >
+        <div>
+          <div style={{ color: '#00d4ff', fontFamily: 'var(--cond)', fontSize: 15, fontWeight: 600, letterSpacing: 1 }}>
+            {title}
           </div>
-          <button
-            onClick={() => setSelectedSensor(null)}
-            style={{
-              background: 'transparent', border: '1px solid var(--border2)',
-              borderRadius: 3, color: 'var(--text3)', cursor: 'pointer',
-              fontSize: 16, lineHeight: 1, padding: '2px 8px', fontFamily: 'monospace',
-            }}
-          >×</button>
+          <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
+            {subtitle}
+          </div>
+          <div style={{ color: '#ef4444', fontFamily: 'var(--mono)', fontSize: 10, marginTop: 2 }}>
+            ▌ {currentDateLabel}
+            {currentDist !== null && (
+              <span style={{ color: '#f59e0b', marginLeft: 8 }}>
+                ⟷ {currentDist < 1000
+                  ? `${Math.round(currentDist)} m to TBM`
+                  : `${(currentDist / 1000).toFixed(1)} km to TBM`}
+              </span>
+            )}
+          </div>
         </div>
+        <button
+          onMouseDown={e => e.stopPropagation()}
+          onClick={() => setSelectedSensor(null)}
+          style={{
+            background: 'transparent', border: '1px solid var(--border2)',
+            borderRadius: 3, color: 'var(--text3)', cursor: 'pointer',
+            fontSize: 16, lineHeight: 1, padding: '2px 8px', fontFamily: 'monospace', flexShrink: 0,
+          }}
+        >×</button>
+      </div>
 
-        {/* Canvas chart */}
-        <div style={{ position: 'relative' }}>
-          <canvas
-            ref={canvasRef}
-            style={canvasStyle}
-            onWheel={onWheel}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseLeave}
-            onClick={onCanvasClick}
-          />
-          <div style={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', gap: 4 }}>
-            <button onClick={() => { const s = viewRef.current.max - viewRef.current.min; const m = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, m - s * 0.6), max: Math.min(fullTsMax, m + s * 0.6) }; draw(null) }} style={zoomBtnStyle}>+</button>
-            <button onClick={() => { const s = viewRef.current.max - viewRef.current.min; const m = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, m - s * 0.85), max: Math.min(fullTsMax, m + s * 0.85) }; draw(null) }} style={zoomBtnStyle}>−</button>
-            <button onClick={() => { viewRef.current = { min: fullTsMin, max: fullTsMax }; draw(null) }} style={zoomBtnStyle}>⊡</button>
-          </div>
-          <div style={{ position: 'absolute', bottom: 6, left: ML, fontSize: 9, fontFamily: 'monospace', color: 'var(--text3)', opacity: 0.6, pointerEvents: 'none' }}>
-            {annotMode ? 'hover to preview · click/tap to place' : 'scroll/pinch to zoom · drag to pan'}
-          </div>
+      {/* ── Canvas area — fills remaining space ── */}
+      <div ref={canvasWrapRef} style={{ flex: 1, position: 'relative', minHeight: 160, overflow: 'hidden' }}>
+        <canvas
+          ref={canvasRef}
+          style={canvasStyle}
+          onWheel={onWheel}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseLeave}
+          onClick={onCanvasClick}
+        />
+        <div style={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', gap: 4 }}>
+          <button onClick={() => { const s = viewRef.current.max - viewRef.current.min; const m = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, m - s * 0.6), max: Math.min(fullTsMax, m + s * 0.6) }; draw(null) }} style={zoomBtnStyle}>+</button>
+          <button onClick={() => { const s = viewRef.current.max - viewRef.current.min; const m = (viewRef.current.min + viewRef.current.max) / 2; viewRef.current = { min: Math.max(fullTsMin, m - s * 0.85), max: Math.min(fullTsMax, m + s * 0.85) }; draw(null) }} style={zoomBtnStyle}>−</button>
+          <button onClick={() => { viewRef.current = { min: fullTsMin, max: fullTsMax }; draw(null) }} style={zoomBtnStyle}>⊡</button>
         </div>
+        <div style={{ position: 'absolute', bottom: 6, left: ML, fontSize: 9, fontFamily: 'monospace', color: 'var(--text3)', opacity: 0.6, pointerEvents: 'none' }}>
+          {annotMode ? 'hover to preview · click/tap to place' : 'scroll/pinch to zoom · drag to pan'}
+        </div>
+      </div>
+
+      {/* ── Bottom content (annotations, table) — scrollable ── */}
+      <div style={{ flexShrink: 0, padding: '0 14px 12px', overflowY: 'auto', maxHeight: 260 }}>
 
         {/* Annotation toolbar — piezometers only */}
         {isPiez && (
