@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { AppData, GroutRecord, TBMRecord } from '../../types'
+import type { AppData, GroutRecord, TBMRecord, XRFRecord } from '../../types'
 import { fmtDate, formatCH } from '../../utils/format'
 import { RING_TYPE_COLORS } from '../../data/params'
 import styles from './ReportsView.module.css'
@@ -7,7 +7,7 @@ import styles from './ReportsView.module.css'
 interface Props { data: AppData | null }
 
 type FilterMode = 'date' | 'chainage' | 'ring'
-type ReportType = 'pregrouting' | 'tbm'
+type ReportType = 'pregrouting' | 'tbm' | 'xrf'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isoToTs(s: string): number {
@@ -459,6 +459,172 @@ function TBMReport({ records }: { records: TBMRecord[] }) {
   )
 }
 
+// ── XRF report ────────────────────────────────────────────────────────────────
+function XRFReport({ records, ringToTs }: { records: XRFRecord[]; ringToTs: Map<number, number> }) {
+  if (!records.length) return (
+    <div className={styles.empty}>
+      <div className={styles.emptyIcon}>🔍</div>
+      <span>No XRF records found for the selected range.</span>
+    </div>
+  )
+
+  const chVals   = records.map(r => r.ch)
+  const chStart  = Math.min(...chVals), chEnd = Math.max(...chVals)
+  const tsArr    = records.map(r => ringToTs.get(r.ring) ?? 0).filter(t => t > 0)
+  const tsStart  = tsArr.length ? Math.min(...tsArr) : 0
+  const tsEnd    = tsArr.length ? Math.max(...tsArr) : 0
+  const sorted   = [...records].sort((a, b) => a.ch - b.ch)
+
+  const ELEMENTS: { key: keyof XRFRecord; label: string; unit: string; note?: string }[] = [
+    { key: 'S',     label: 'Sulphur (S)',    unit: '%',   note: '>0.5% elevated, >1% high' },
+    { key: 'NP_AP', label: 'NP:AP',          unit: '',    note: '<1 = acid-generating potential' },
+    { key: 'Fe_S',  label: 'Fe:S',           unit: '',    note: '>1 pyrite-buffered' },
+    { key: 'U',     label: 'Uranium (U)',     unit: 'ppm' },
+    { key: 'Ca',    label: 'Calcium (Ca)',    unit: '%' },
+    { key: 'Fe',    label: 'Iron (Fe)',       unit: '%' },
+    { key: 'Al',    label: 'Aluminium (Al)',  unit: '%' },
+    { key: 'Si',    label: 'Silicon (Si)',    unit: '%' },
+    { key: 'K',     label: 'Potassium (K)',   unit: '%' },
+    { key: 'Ti',    label: 'Titanium (Ti)',   unit: '%' },
+    { key: 'Mg',    label: 'Magnesium (Mg)',  unit: '%' },
+  ]
+
+  function stat(vals: number[]) {
+    const v = vals.filter(x => x > 0)
+    if (!v.length) return { min: 0, avgV: 0, max: 0 }
+    return { min: Math.min(...v), avgV: sum(v) / v.length, max: Math.max(...v) }
+  }
+
+  const acidRisk = records.filter(r => r.S > 0.5 || r.NP_AP < 1).length
+  const highS    = records.filter(r => r.S > 1).length
+  const maxS     = Math.max(...records.map(r => r.S), 0.01)
+
+  function exportCSV() {
+    const header = ['Ring','Chainage','S%','U ppm','NP:AP','Fe:S','Ca%','Fe%','Al%','K%','Si%','Ti%','Mg%']
+    const rows = sorted.map(r => [
+      String(r.ring), formatCH(r.ch),
+      r.S.toFixed(3), r.U.toFixed(0), r.NP_AP.toFixed(2), r.Fe_S.toFixed(2),
+      r.Ca.toFixed(2), r.Fe.toFixed(2), r.Al.toFixed(2), r.K.toFixed(2),
+      r.Si.toFixed(2), r.Ti.toFixed(3), r.Mg.toFixed(2),
+    ])
+    downloadCSV(`xrf_${formatCH(chStart).replace(/\s/g,'')}_${formatCH(chEnd).replace(/\s/g,'')}.csv`, [header, ...rows])
+  }
+
+  return (
+    <div className={styles.report}>
+      <div className={styles.reportHeader}>
+        <div>
+          <div className={styles.reportTitle}>XRF Rock Chemistry Report</div>
+          <div className={styles.reportMeta}>
+            Chainage: {formatCH(chStart)} – {formatCH(chEnd)}<br />
+            {tsStart > 0 && <>Period: {fmtDate(tsStart)} – {fmtDate(tsEnd)}<br /></>}
+            Generated: {fmtDate(Math.floor(Date.now() / 1000))}
+          </div>
+        </div>
+        <div className={styles.exportRow}>
+          <button className={styles.exportBtn} onClick={exportCSV}>↓ CSV</button>
+        </div>
+      </div>
+
+      <div className={styles.kpiGrid}>
+        <KPI value={records.length} label="Rings analyzed" />
+        <KPI value={`${Math.round(chEnd - chStart)}`} unit="m" label="Chainage span" />
+        <KPI value={acidRisk} label="Acid risk rings" color={acidRisk > 0 ? '#ef4444' : '#22c55e'} />
+        <KPI value={highS} label="High S >1%" color={highS > 0 ? '#f97316' : '#22c55e'} />
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Element Statistics</div>
+        <div className={styles.tableWrap}>
+          <table className={styles.reportTable}>
+            <thead><tr>
+              <th>Element</th>
+              <th className={styles.right}>Min</th>
+              <th className={styles.right}>Avg</th>
+              <th className={styles.right}>Max</th>
+              <th>Note</th>
+            </tr></thead>
+            <tbody>
+              {ELEMENTS.map(({ key, label, unit, note }) => {
+                const vals = records.map(r => (r as unknown as Record<string, number>)[key as string] ?? 0)
+                const s = stat(vals)
+                const isAlert = (key === 'NP_AP' && s.avgV < 1 && s.avgV > 0) || (key === 'S' && s.avgV > 0.5)
+                const fmt = (v: number) => unit === 'ppm' ? v.toFixed(0) : v.toFixed(3)
+                return (
+                  <tr key={String(key)}>
+                    <td>{label}</td>
+                    <td className={styles.right}>{fmt(s.min)}{unit && <span style={{ color: 'var(--text3)' }}> {unit}</span>}</td>
+                    <td className={styles.right} style={isAlert ? { color: '#f97316' } : {}}>
+                      {fmt(s.avgV)}{unit && <span style={{ color: 'var(--text3)' }}> {unit}</span>}
+                    </td>
+                    <td className={styles.right}>{fmt(s.max)}{unit && <span style={{ color: 'var(--text3)' }}> {unit}</span>}</td>
+                    <td className={styles.muted} style={{ fontSize: 9 }}>{note ?? ''}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Sulphur Profile</div>
+        <div className={styles.chartArea}>
+          <div className={styles.chartTitle}>S % by chainage — risk thresholds: orange &gt;0.5%, red &gt;1%</div>
+          <div className={styles.barChart}>
+            {sorted.map((r, i) => (
+              <div key={i} className={styles.barRow}>
+                <div className={styles.barLbl}>{formatCH(r.ch)}</div>
+                <div className={styles.barBg}>
+                  <div className={styles.barFill} style={{
+                    width: `${(r.S / maxS) * 100}%`,
+                    background: r.S > 1 ? '#ef4444' : r.S > 0.5 ? '#f97316' : '#22c55e',
+                  }} />
+                </div>
+                <div className={styles.barNum}>{r.S.toFixed(3)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Ring Data</div>
+        <div className={styles.tableWrap}>
+          <table className={styles.reportTable}>
+            <thead><tr>
+              <th>Ring</th>
+              <th className={styles.right}>CH</th>
+              <th className={styles.right}>S%</th>
+              <th className={styles.right}>NP:AP</th>
+              <th className={styles.right}>Fe:S</th>
+              <th className={styles.right}>Ca%</th>
+              <th className={styles.right}>Fe%</th>
+              <th className={styles.right}>Si%</th>
+              <th className={styles.right}>U ppm</th>
+            </tr></thead>
+            <tbody>
+              {sorted.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ fontWeight: 600 }}>{r.ring}</td>
+                  <td className={styles.right}>{formatCH(r.ch)}</td>
+                  <td className={styles.right} style={r.S > 0.5 ? { color: r.S > 1 ? '#ef4444' : '#f97316' } : {}}>{r.S.toFixed(3)}</td>
+                  <td className={styles.right} style={r.NP_AP > 0 && r.NP_AP < 1 ? { color: '#ef4444' } : {}}>{r.NP_AP.toFixed(2)}</td>
+                  <td className={styles.right}>{r.Fe_S.toFixed(2)}</td>
+                  <td className={styles.right}>{r.Ca.toFixed(2)}</td>
+                  <td className={styles.right}>{r.Fe.toFixed(2)}</td>
+                  <td className={styles.right}>{r.Si.toFixed(2)}</td>
+                  <td className={styles.right}>{r.U.toFixed(0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Shared KPI card ───────────────────────────────────────────────────────────
 function KPI({ value, unit, label, color }: { value: string | number; unit?: string; label: string; color?: string }) {
   return (
@@ -502,6 +668,25 @@ function applyFilter<T extends { ts: number; ch: number }>(
   const chB = ringToCh.get(rTo)   ?? Infinity
   const chLo = Math.min(chA, chB), chHi = Math.max(chA, chB)
   return records.filter(r => r.ch >= chLo && r.ch <= chHi)
+}
+
+// ── Filter helper for XRF ────────────────────────────────────────────────────
+function applyFilterXRF(
+  records: XRFRecord[],
+  snap: { mode: FilterMode; from: string; to: string },
+  ringToTs: Map<number, number>,
+): XRFRecord[] {
+  if (snap.mode === 'date') {
+    const tsFrom = isoToTs(snap.from), tsTo = isoToTs(snap.to) + 86400
+    return records.filter(r => { const ts = ringToTs.get(r.ring) ?? 0; return ts >= tsFrom && ts <= tsTo })
+  }
+  if (snap.mode === 'chainage') {
+    const from = parseFloat(snap.from), to = parseFloat(snap.to)
+    return records.filter(r => r.ch >= from && r.ch <= to)
+  }
+  const rFrom = parseInt(snap.from), rTo = parseInt(snap.to)
+  const lo = Math.min(rFrom, rTo), hi = Math.max(rFrom, rTo)
+  return records.filter(r => r.ring >= lo && r.ring <= hi)
 }
 
 // ── Filter helper for TBM (ring-based) ───────────────────────────────────────
@@ -552,6 +737,12 @@ export function ReportsView({ data }: Props) {
     return m
   }, [data])
 
+  const ringToTs = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const t of data?.tbm ?? []) m.set(t.ring, t.ts)
+    return m
+  }, [data])
+
   const filteredGrout = useMemo(() => {
     if (!data || !filterSnap) return []
     return applyFilter(data.grout, filterSnap, ringToCh)
@@ -561,6 +752,11 @@ export function ReportsView({ data }: Props) {
     if (!data || !filterSnap) return []
     return applyFilterTBM(data.tbm, filterSnap)
   }, [data, filterSnap])
+
+  const filteredXRF = useMemo(() => {
+    if (!data || !filterSnap) return []
+    return applyFilterXRF(data.xrf, filterSnap, ringToTs)
+  }, [data, filterSnap, ringToTs])
 
   function generate() {
     setFilterSnap(
@@ -574,6 +770,7 @@ export function ReportsView({ data }: Props) {
   const REPORT_TYPES: { id: ReportType; icon: string; label: string; sub: string }[] = [
     { id: 'tbm',        icon: '⚙',  label: 'TBM Production', sub: 'Rings, advance rate, parameters' },
     { id: 'pregrouting',icon: '🔩', label: 'Pre-Grouting',   sub: 'Screens, injection, inleakage'   },
+    { id: 'xrf',        icon: '⬡',  label: 'XRF Chemistry',  sub: 'Sulphur, acid risk, elements'    },
   ]
 
   return (
@@ -657,6 +854,8 @@ export function ReportsView({ data }: Props) {
           </div>
         ) : reportType === 'tbm' ? (
           <TBMReport records={filteredTBM} />
+        ) : reportType === 'xrf' ? (
+          <XRFReport records={filteredXRF} ringToTs={ringToTs} />
         ) : (
           <PregroutReport records={filteredGrout} />
         )}
