@@ -39,10 +39,6 @@ export function ProfileView({ data }: Props) {
   const [vExag, setVExag]       = useState(1)
   const [panelOpen, setPanelOpen] = useState(false)
   const [tooltip, setTooltip]   = useState<HitResult | null>(null)
-  const [crosshair, setCrosshair] = useState<{
-    x: number; ch: number; ring: number | null
-    surfaceElev: number | null; tunnelElev: number | null; cover: number | null
-  } | null>(null)
 
   const paramDef = PARAMS[profChannel.param] ?? PARAMS.fpi
 
@@ -315,7 +311,7 @@ export function ProfileView({ data }: Props) {
   }
 
   function onMouseDown(e: React.MouseEvent) {
-    setTooltip(null); setCrosshair(null); isDragging.current = true
+    setTooltip(null); isDragging.current = true
     dragStart.current = { x: e.clientX, chMin: viewRef.current.chMin, chMax: viewRef.current.chMax }
   }
 
@@ -323,34 +319,7 @@ export function ProfileView({ data }: Props) {
     if (!canvasRef.current) return
     const rect = canvasRef.current.getBoundingClientRect()
     const relX = e.clientX - rect.left, relY = e.clientY - rect.top
-    if (!isDragging.current) {
-      setTooltip(hitTestMano(relX, relY))
-      // Crosshair
-      const W = rect.width
-      const PL = 64, PR = 24, PW2 = W - PL - PR
-      const { chMin, chMax } = viewRef.current
-      if (PW2 > 0 && relX >= PL && relX <= PL + PW2 && data) {
-        const scaleH = PW2 / (chMax - chMin)
-        const ch = chMin + (relX - PL) / scaleH
-        let nearPt = data.profile[0]
-        let bd = Infinity
-        for (const p of data.profile) { const d = Math.abs(p.ch - ch); if (d < bd) { bd = d; nearPt = p } }
-        const excTBM = data.tbm.filter(t => t.ts <= currentTs)
-        let nearRing: typeof data.tbm[0] | null = null
-        bd = Infinity
-        for (const t of excTBM) { const d = Math.abs(t.ch - ch); if (d < bd) { bd = d; nearRing = t } }
-        const rawCover = nearPt ? nearPt.surfaceElev - nearPt.tunnelElev - TUNNEL_R : null
-        setCrosshair({
-          x: relX, ch,
-          ring: nearRing?.ring ?? null,
-          surfaceElev: nearPt?.surfaceElev ?? null,
-          tunnelElev: nearPt?.tunnelElev ?? null,
-          cover: rawCover && rawCover > 0 ? rawCover : null,
-        })
-      } else {
-        setCrosshair(null)
-      }
-    }
+    if (!isDragging.current) setTooltip(hitTestMano(relX, relY))
     if (!isDragging.current) return
     const v = viewRef.current
     const PW = canvasRef.current.width / (window.devicePixelRatio || 1) - 64 - 24
@@ -456,41 +425,13 @@ export function ProfileView({ data }: Props) {
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
-          onMouseLeave={() => { isDragging.current = false; setTooltip(null); setCrosshair(null) }}
+          onMouseLeave={() => { isDragging.current = false; setTooltip(null) }}
           onClick={onCanvasClick}
         >
           <canvas
             ref={canvasRef}
             style={{ display:'block', cursor: tooltip ? 'pointer' : 'crosshair', width:'100%', height:'100%' }}
           />
-
-          {/* Chainage crosshair */}
-          {crosshair && (
-            <>
-              <div style={{
-                position: 'absolute', left: crosshair.x, top: 32, bottom: 44,
-                width: 1, background: 'rgba(0,212,255,0.4)', pointerEvents: 'none', zIndex: 4,
-              }} />
-              {!tooltip && (
-                <div style={{
-                  position: 'absolute',
-                  left: crosshair.x > (wrapRef.current?.clientWidth ?? 0) / 2 ? crosshair.x - 136 : crosshair.x + 10,
-                  top: 38, pointerEvents: 'none', zIndex: 5,
-                  background: 'var(--bg2)', border: '1px solid var(--border2)',
-                  borderRadius: 5, padding: '6px 10px',
-                  fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text2)', lineHeight: '1.9',
-                }}>
-                  <div style={{ fontFamily: 'var(--cond)', fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
-                    {formatCH(crosshair.ch)}
-                  </div>
-                  {crosshair.ring !== null && <div>Ring <span style={{ color: 'var(--text)' }}>{crosshair.ring}</span></div>}
-                  {crosshair.surfaceElev !== null && <div>Surface <span style={{ color: 'var(--text)' }}>{crosshair.surfaceElev.toFixed(1)} m</span></div>}
-                  {crosshair.tunnelElev !== null && <div>Tunnel CL <span style={{ color: 'var(--text)' }}>{crosshair.tunnelElev.toFixed(1)} m</span></div>}
-                  {crosshair.cover !== null && <div>Cover <span style={{ color: 'var(--text)' }}>{crosshair.cover.toFixed(1)} m</span></div>}
-                </div>
-              )}
-            </>
-          )}
 
           {tooltip && (
             <div className={styles.profileTooltip} style={{ left: tooltip.x + 10, top: Math.max(8, tooltip.y - 36) }}>

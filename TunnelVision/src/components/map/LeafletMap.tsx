@@ -396,7 +396,6 @@ export function LeafletMap({ data }: Props) {
     const map = mapRef.current; if (!map || !data) return
     removeLayer('piezos')
     if (!layerVis.piezos) return
-    const TREND_WIN = 7 * 86400
     const pl = L.layerGroup()
     for (const p of data.piezometers) {
       const hasSeries = p.series.length > 0
@@ -417,33 +416,15 @@ export function LeafletMap({ data }: Props) {
         }
       }
 
-      // 7-day trend arrow
-      let trendArrow = '', trendColor = 'transparent', trendKPa = 0
-      if (hasSeries) {
-        const win = p.series.filter(s => s[0] >= currentTs - TREND_WIN && s[0] <= currentTs)
-        if (win.length >= 2) {
-          trendKPa = win[win.length - 1][1] - win[0][1]
-          if (trendKPa > 5)       { trendArrow = '↑'; trendColor = '#ef4444' }
-          else if (trendKPa < -5) { trendArrow = '↓'; trendColor = '#22c55e' }
-          else                    { trendArrow = '→'; trendColor = '#94a3b8' }
-        }
-      }
-
       const half = radius
       const icon = L.divIcon({
-        html: `<div style="position:relative;width:0;height:0">
-          <div style="position:absolute;width:${radius*2}px;height:${radius*2}px;background:${color};border-radius:50%;border:1.5px solid #fff;top:${-half}px;left:${-half}px;${hasSeries ? 'cursor:pointer' : ''}"></div>
-          ${trendArrow ? `<div style="position:absolute;top:${-(half+13)}px;left:-5px;color:${trendColor};font-size:13px;font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.7);pointer-events:none;line-height:1">${trendArrow}</div>` : ''}
-        </div>`,
+        html: `<div style="width:${radius*2}px;height:${radius*2}px;background:${color};border-radius:50%;border:1.5px solid #fff;transform:translate(-${half}px,-${half}px);${hasSeries ? 'cursor:pointer' : ''}"></div>`,
         className: '',
       })
-      const recentVal = hasSeries ? p.series.filter(s => s[0] <= currentTs).at(-1)?.[1] : null
       const marker = L.marker([p.lat, p.lon], { icon, pane: 'piezosPane' })
         .bindTooltip(
           `<b style="color:${color}">PZ ${p.id}${p.sensorName ? ' (' + p.sensorName + ')' : ''}</b><br/>` +
-          (recentVal !== null && recentVal !== undefined ? `Pressure: ${recentVal.toFixed(1)} kPa<br/>` : '') +
-          (trendArrow ? `7-day: <span style="color:${trendColor}">${trendArrow} ${Math.abs(trendKPa).toFixed(1)} kPa</span><br/>` : '') +
-          `${p.method} · Depth: ${p.depth}m` +
+          `${p.method}<br/>${p.soilClass}<br/>Depth: ${p.depth}m` +
           (hasSeries ? '<br/><span style="color:#7090a8;font-size:10px">Click to graph</span>' : ''),
           { sticky: true, className: 'tbm-tip' }
         )
@@ -489,48 +470,6 @@ export function LeafletMap({ data }: Props) {
     hl.addTo(map)
     layersRef.current.tbmHead = hl
   }, [data, currentTs])
-
-  // ── Chainage crosshair popup ──────────────────────────────────────────────
-  const dataRef = useRef<NonNullable<typeof data> | null>(null)
-  useEffect(() => { dataRef.current = data }, [data])
-
-  useEffect(() => {
-    const map = mapRef.current; if (!map) return
-    function handleClick(e: L.LeafletMouseEvent) {
-      const d = dataRef.current; if (!d) return
-      // Skip if clicking on an interactive element (marker, polygon etc.)
-      const target = e.originalEvent.target as HTMLElement
-      if (target.classList.contains('leaflet-interactive') || target.closest?.('.leaflet-marker-icon')) return
-      const { lat, lng } = e.latlng
-      // Nearest alignment point
-      let best = d.alignment[0], bd = Infinity
-      for (const a of d.alignment) {
-        const dx = a.lat - lat, dy = a.lon - lng
-        const dist = dx * dx + dy * dy
-        if (dist < bd) { bd = dist; best = a }
-      }
-      // Nearest excavated TBM ring
-      let bestRing: typeof d.tbm[0] | null = null
-      bd = Infinity
-      for (const t of d.tbm) { const dd = Math.abs(t.ch - best.ch); if (dd < bd) { bd = dd; bestRing = t } }
-      // Profile data at that chainage
-      let profPt = d.profile[0]
-      for (const p of d.profile) { if (p.ch >= best.ch) { profPt = p; break } }
-      const cover = profPt ? profPt.surfaceElev - profPt.tunnelElev - 3.5 : null
-      const html = `<div style="font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.9;min-width:140px">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:4px">${formatCH(best.ch)}</div>
-        ${bestRing ? `<div style="color:var(--text2)">Ring <span style="color:var(--text)">${bestRing.ring}</span></div>` : ''}
-        <div style="color:var(--text2)">Surface <span style="color:var(--text)">${profPt?.surfaceElev?.toFixed(1) ?? '—'} m</span></div>
-        <div style="color:var(--text2)">Tunnel CL <span style="color:var(--text)">${profPt?.tunnelElev?.toFixed(1) ?? '—'} m</span></div>
-        ${cover !== null && cover > 0 ? `<div style="color:var(--text2)">Cover <span style="color:var(--text)">${cover.toFixed(1)} m</span></div>` : ''}
-        ${profPt?.soilDepth ? `<div style="color:var(--text2)">Soil depth <span style="color:var(--text)">${profPt.soilDepth.toFixed(1)} m</span></div>` : ''}
-      </div>`
-      L.popup({ className: 'ch-popup', offset: [0, -2], closeButton: true })
-        .setLatLng(e.latlng).setContent(html).openOn(map!)
-    }
-    map.on('click', handleClick)
-    return () => { map.off('click', handleClick) }
-  }, [])
 
   // ── Draw CH markers ───────────────────────────────────────────────────────
   function redrawMarkers(map: L.Map) {

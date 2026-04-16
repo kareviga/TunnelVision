@@ -87,25 +87,6 @@ body {
 @keyframes pulse    { 0%,100% { opacity:1 } 50% { opacity:.3 } }
 @keyframes tbmp     { 0%,100% { transform:scale(1);opacity:.7 } 50% { transform:scale(1.8);opacity:0 } }
 
-/* ── Chainage info popup ─────────────────────────────────────────────────────── */
-.ch-popup .leaflet-popup-content-wrapper {
-  background: var(--bg2) !important;
-  border: 1px solid var(--border2) !important;
-  border-radius: 6px !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,.4) !important;
-  color: var(--text) !important;
-  padding: 0 !important;
-}
-.ch-popup .leaflet-popup-content { margin: 10px 14px !important; }
-.ch-popup .leaflet-popup-tip-container { display: none !important; }
-.ch-popup .leaflet-popup-close-button {
-  color: var(--text3) !important;
-  font-size: 18px !important;
-  padding: 4px 8px !important;
-  top: 2px !important; right: 2px !important;
-}
-.ch-popup .leaflet-popup-close-button:hover { color: var(--text) !important; }
-
 /* ── Print styles (Reports view) ────────────────────────────────────────────── */
 @media print {
   body { background: #fff; color: #000; overflow: visible; height: auto; }
