@@ -37,7 +37,7 @@ export function MapView({ data }: Props) {
         <div className={`${styles.panelOverlay} ${panelOpen ? styles.open : ''}`}>
           <MapPanel data={data} />
         </div>
-        <div ref={mapContainerRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
+        <div ref={mapContainerRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <LeafletMap data={data} />
         </div>
       </div>
