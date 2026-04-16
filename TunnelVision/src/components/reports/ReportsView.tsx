@@ -1,6 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
+import { useState, useMemo } from 'react'
 import type { AppData, GroutRecord, TBMRecord } from '../../types'
 import { fmtDate, formatCH } from '../../utils/format'
 import { RING_TYPE_COLORS } from '../../data/params'
@@ -46,42 +44,8 @@ function Badge({ label, color, bg }: { label: string; color: string; bg: string 
 }
 
 // ── PDF export helper ─────────────────────────────────────────────────────────
-async function generatePDF(el: HTMLElement, filename: string) {
-  const canvas = await html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: getComputedStyle(document.documentElement)
-      .getPropertyValue('--bg').trim() || '#0a0c10',
-  })
-  const imgData = canvas.toDataURL('image/png')
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const pageW = pdf.internal.pageSize.getWidth()
-  const pageH = pdf.internal.pageSize.getHeight()
-  const margin = 10
-  const usableW = pageW - margin * 2
-  const imgH = (canvas.height / canvas.width) * usableW
-  let y = margin
-  let remaining = imgH
-  while (remaining > 0) {
-    const sliceH = Math.min(remaining, pageH - margin * 2)
-    const srcY = (imgH - remaining) / imgH * canvas.height
-    const srcH = sliceH / imgH * canvas.height
-    const sliceCanvas = document.createElement('canvas')
-    sliceCanvas.width = canvas.width
-    sliceCanvas.height = srcH
-    const ctx = sliceCanvas.getContext('2d')!
-    ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH)
-    if (remaining < imgH) pdf.addPage()
-    pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, y, usableW, sliceH)
-    remaining -= sliceH
-    y = margin
-  }
-  pdf.save(filename)
-}
-
 // ── Pre-grouting report ───────────────────────────────────────────────────────
 function PregroutReport({ records }: { records: GroutRecord[] }) {
-  const reportRef = useRef<HTMLDivElement>(null)
   if (!records.length) return (
     <div className={styles.empty}>
       <div className={styles.emptyIcon}>🔍</div>
@@ -127,7 +91,7 @@ function PregroutReport({ records }: { records: GroutRecord[] }) {
   }
 
   return (
-    <div className={styles.report} ref={reportRef}>
+    <div className={styles.report}>
       <div className={styles.reportHeader}>
         <div>
           <div className={styles.reportTitle}>Pre-Grouting Report</div>
@@ -139,7 +103,6 @@ function PregroutReport({ records }: { records: GroutRecord[] }) {
         </div>
         <div className={styles.exportRow}>
           <button className={styles.exportBtn} onClick={exportCSV}>↓ CSV</button>
-          <button className={styles.exportBtn} onClick={() => reportRef.current && generatePDF(reportRef.current, `pregrouting_${tsToIso(tsStart)}_${tsToIso(tsEnd)}.pdf`)}>↓ PDF</button>
         </div>
       </div>
 
@@ -235,7 +198,6 @@ function PregroutReport({ records }: { records: GroutRecord[] }) {
 
 // ── TBM Production report ─────────────────────────────────────────────────────
 function TBMReport({ records }: { records: TBMRecord[] }) {
-  const reportRef = useRef<HTMLDivElement>(null)
   if (!records.length) return (
     <div className={styles.empty}>
       <div className={styles.emptyIcon}>🔍</div>
@@ -317,7 +279,7 @@ function TBMReport({ records }: { records: TBMRecord[] }) {
   }
 
   return (
-    <div className={styles.report} ref={reportRef}>
+    <div className={styles.report}>
       <div className={styles.reportHeader}>
         <div>
           <div className={styles.reportTitle}>TBM Production Report</div>
@@ -329,7 +291,6 @@ function TBMReport({ records }: { records: TBMRecord[] }) {
         </div>
         <div className={styles.exportRow}>
           <button className={styles.exportBtn} onClick={exportCSV}>↓ CSV</button>
-          <button className={styles.exportBtn} onClick={() => reportRef.current && generatePDF(reportRef.current, `tbm_production_${tsToIso(tsStart)}_${tsToIso(tsEnd)}.pdf`)}>↓ PDF</button>
         </div>
       </div>
 
