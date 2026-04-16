@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChannelState, LayerKey, ProfLayerKey } from '../types'
+import type { ChannelState, LayerKey, ProfLayerKey, ThreeDLayerKey } from '../types'
 import { getDefaultClasses, PARAMS } from '../data/params'
 
 export interface LayerStyle {
@@ -101,6 +101,14 @@ interface AppStore {
   updateProfChannel: (patch: Partial<ChannelState>) => void
   profLayers: Record<ProfLayerKey, boolean>
   toggleProfLayer: (k: ProfLayerKey) => void
+
+  // 3D view
+  threedLayers: Record<ThreeDLayerKey, boolean>
+  toggleThreedLayer: (k: ThreeDLayerKey) => void
+
+  // PNG export trigger (increment to fire in active view)
+  exportPNGTick: number
+  triggerExportPNG: () => void
 }
 
 export const useStore = create<AppStore>((set, get) => ({
@@ -175,7 +183,7 @@ export const useStore = create<AppStore>((set, get) => ({
     return { piezAnnotations: next }
   }),
 
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => set(s => {
     const next = s.theme === 'dark' ? 'light' : 'dark'
     document.documentElement.setAttribute('data-theme', next)
@@ -211,4 +219,11 @@ export const useStore = create<AppStore>((set, get) => ({
   profLayers: { grout: true, mano: true, soil: true, rock: true },
   toggleProfLayer: k =>
     set(s => ({ profLayers: { ...s.profLayers, [k]: !s.profLayers[k] } })),
+
+  threedLayers: { tunnel: true, tbm: true, rings: true, terrain: true, piezos: true, drillholes: true },
+  toggleThreedLayer: k =>
+    set(s => ({ threedLayers: { ...s.threedLayers, [k]: !s.threedLayers[k] } })),
+
+  exportPNGTick: 0,
+  triggerExportPNG: () => set(s => ({ exportPNGTick: s.exportPNGTick + 1 })),
 }))

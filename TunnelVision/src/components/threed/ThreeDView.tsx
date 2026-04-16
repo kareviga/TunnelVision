@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useStore } from '../../store/useStore'
+import { ThreeDPanel } from './ThreeDPanel'
 import type { AppData } from '../../types'
 import styles from './ThreeDView.module.css'
 
@@ -19,7 +20,6 @@ const TBM_PARTS: { name: string; len: number; hex: number; emissive?: number }[]
 ]
 
 // ── Coordinate helpers ────────────────────────────────────────────────────────
-// Use easting/northing (already in metres) directly as X/Z
 function alignVec3(e: number, n: number, elev: number, e0: number, n0: number): THREE.Vector3 {
   return new THREE.Vector3(e - e0, elev, -(n - n0))
 }
@@ -35,32 +35,44 @@ function findNearestIdx(pts: { ch: number }[], targetCh: number): number {
 
 // ── Scene ref state ───────────────────────────────────────────────────────────
 interface SceneState {
-  renderer:   THREE.WebGLRenderer
-  scene:      THREE.Scene
-  camera:     THREE.PerspectiveCamera
-  controls:   OrbitControls
-  tbmGroup:   THREE.Group
-  coneLight:  THREE.PointLight
-  excTube:    THREE.Mesh
-  futTube:    THREE.Mesh
-  tubularSegs: number
-  alignPts:   { pos: THREE.Vector3; ch: number; dir: THREE.Vector3; perp: THREE.Vector3 }[]
+  renderer:       THREE.WebGLRenderer
+  scene:          THREE.Scene
+  camera:         THREE.PerspectiveCamera
+  controls:       OrbitControls
+  tbmGroup:       THREE.Group
+  tunnelGroup:    THREE.Group
+  ringGroup:      THREE.Group
+  terrainGroup:   THREE.Group
+  piezosGroup:    THREE.Group
+  centrelineMesh: THREE.Line
+  gridHelper:     THREE.GridHelper
+  coneLight:      THREE.PointLight
+  excTube:        THREE.Mesh
+  futTube:        THREE.Mesh
+  tubularSegs:    number
+  alignPts:       { pos: THREE.Vector3; ch: number; dir: THREE.Vector3; perp: THREE.Vector3 }[]
   chMin: number
   chMax: number
   rafId: number
-  drillHolesMesh: THREE.LineSegments | null
-  drillHolesChainages: number[]   // chainage per hole, parallel to geometry vertex pairs
+  drillHolesMesh:      THREE.LineSegments | null
+  drillHolesChainages: number[]
+  initCamPos:     THREE.Vector3
+  initTarget:     THREE.Vector3
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props { data: AppData | null }
 
 export function ThreeDView({ data }: Props) {
-  const currentTs      = useStore(s => s.currentTs)
-  const zoomToTBMTick  = useStore(s => s.zoomToTBMTick)
-  const theme          = useStore(s => s.theme)
-  const mountRef   = useRef<HTMLDivElement>(null)
-  const stateRef   = useRef<SceneState | null>(null)
+  const currentTs       = useStore(s => s.currentTs)
+  const zoomToTBMTick   = useStore(s => s.zoomToTBMTick)
+  const theme           = useStore(s => s.theme)
+  const threedLayers     = useStore(s => s.threedLayers)
+  const exportPNGTick    = useStore(s => s.exportPNGTick)
+  const activeView       = useStore(s => s.activeView)
+  const mountRef         = useRef<HTMLDivElement>(null)
+  const stateRef         = useRef<SceneState | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   // ── Initialise scene (once, when data is ready) ───────────────────────────
   useEffect(() => {
@@ -81,12 +93,10 @@ export function ThreeDView({ data }: Props) {
       ch:   a.ch,
     }))
 
-    // Subsample for tube geometry (every 4th pt → ~1500 pts max)
     const step = Math.max(1, Math.floor(rawPts.length / 400))
     const tubePts = rawPts.filter((_, i) => i % step === 0 || i === rawPts.length - 1)
     const tubularSegs = tubePts.length - 1
 
-    // Direction + perpendicular for each tube point
     const alignPts = tubePts.map((p, i) => {
       const prev = tubePts[Math.max(0, i - 1)].pos
       const next = tubePts[Math.min(tubePts.length - 1, i + 1)].pos
@@ -96,7 +106,7 @@ export function ThreeDView({ data }: Props) {
     })
 
     // ── Renderer ──────────────────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(el.clientWidth, el.clientHeight)
     renderer.setClearColor(0x080a0e)
@@ -109,7 +119,9 @@ export function ThreeDView({ data }: Props) {
     // ── Camera ────────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(55, el.clientWidth / el.clientHeight, 1, 60000)
     const midPt  = alignPts[Math.floor(alignPts.length / 2)].pos
-    camera.position.set(midPt.x + 800, midPt.y + 600, midPt.z + 1200)
+    const initCamPos = new THREE.Vector3(midPt.x + 800, midPt.y + 600, midPt.z + 1200)
+    const initTarget = midPt.clone()
+    camera.position.copy(initCamPos)
     camera.lookAt(midPt)
 
     // ── Controls ──────────────────────────────────────────────────────────
@@ -121,10 +133,9 @@ export function ThreeDView({ data }: Props) {
     controls.maxDistance = 30000
     controls.update()
 
-    // Double-click → reset to overview
     renderer.domElement.addEventListener('dblclick', () => {
-      camera.position.set(midPt.x + 800, midPt.y + 600, midPt.z + 1200)
-      controls.target.copy(midPt)
+      camera.position.copy(initCamPos)
+      controls.target.copy(initTarget)
       controls.update()
     })
 
@@ -137,29 +148,26 @@ export function ThreeDView({ data }: Props) {
     scene.add(coneLight)
 
     // ── Tube geometry ─────────────────────────────────────────────────────
-    const curve = new THREE.CatmullRomCurve3(alignPts.map(p => p.pos), false, 'catmullrom', 0.1)
-
+    const curve   = new THREE.CatmullRomCurve3(alignPts.map(p => p.pos), false, 'catmullrom', 0.1)
     const tubeGeo = new THREE.TubeGeometry(curve, tubularSegs, TUNNEL_R, RADIAL_SEGS, false)
 
-    // Excavated: bright cyan interior
     const excMat = new THREE.MeshPhongMaterial({
       color: 0x003344, emissive: 0x001a22,
-      transparent: true, opacity: 0.55,
-      side: THREE.BackSide,
+      transparent: true, opacity: 0.55, side: THREE.BackSide,
     })
     const excTube = new THREE.Mesh(tubeGeo, excMat)
-    scene.add(excTube)
 
-    // Future: dim wireframe-style
     const futMat = new THREE.MeshPhongMaterial({
-      color: 0x00d4ff,
-      transparent: true, opacity: 0.06,
-      side: THREE.BackSide,
+      color: 0x00d4ff, transparent: true, opacity: 0.06, side: THREE.BackSide,
     })
     const futTube = new THREE.Mesh(tubeGeo.clone(), futMat)
-    scene.add(futTube)
 
-    // Tube edge ring outlines (bright at intervals)
+    const tunnelGroup = new THREE.Group()
+    tunnelGroup.add(excTube, futTube)
+    scene.add(tunnelGroup)
+
+    // ── Ring outlines ──────────────────────────────────────────────────────
+    const ringGroup = new THREE.Group()
     for (let i = 0; i < alignPts.length; i += 20) {
       const pt  = alignPts[i]
       const geo = new THREE.TorusGeometry(TUNNEL_R + 0.08, 0.06, 6, RADIAL_SEGS)
@@ -167,16 +175,21 @@ export function ThreeDView({ data }: Props) {
       const ring = new THREE.Mesh(geo, mat)
       ring.position.copy(pt.pos)
       ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pt.dir)
-      scene.add(ring)
+      ringGroup.add(ring)
     }
+    scene.add(ringGroup)
 
     // ── Terrain strip ─────────────────────────────────────────────────────
-    buildTerrainStrip(scene, alignPts)
+    const terrainGroup = new THREE.Group()
+    buildTerrainStrip(terrainGroup, alignPts)
+    scene.add(terrainGroup)
 
     // ── Piezometers ───────────────────────────────────────────────────────
+    const piezosGroup = new THREE.Group()
     if (data.piezometers?.length) {
-      buildPiezometers(scene, data.piezometers, e0, n0)
+      buildPiezometers(piezosGroup, data.piezometers, e0, n0)
     }
+    scene.add(piezosGroup)
 
     // ── Drill holes ───────────────────────────────────────────────────────
     let drillHolesMesh: THREE.LineSegments | null = null
@@ -190,35 +203,29 @@ export function ThreeDView({ data }: Props) {
     // ── TBM group ─────────────────────────────────────────────────────────
     const tbmGroup = new THREE.Group()
     let yOffset = 0
-
     for (const seg of TBM_PARTS) {
-      // Cutterhead: closed cylinder (solid plate); shields: open tube
       const isCutter = seg.name === 'Cutterhead'
       const geo = new THREE.CylinderGeometry(TUNNEL_R - 0.05, TUNNEL_R - 0.05, seg.len, RADIAL_SEGS, 1, !isCutter)
       const mat = new THREE.MeshPhongMaterial({ color: seg.hex, shininess: 80, side: THREE.DoubleSide })
       const mesh = new THREE.Mesh(geo, mat)
-      // CylinderGeometry along Y; offset so cutter face is at y=0
       mesh.position.y = -(yOffset + seg.len / 2)
       yOffset += seg.len
       tbmGroup.add(mesh)
     }
-
-    // Back cap
-    const backGeo = new THREE.CircleGeometry(TUNNEL_R - 0.05, RADIAL_SEGS)
-    const backMat = new THREE.MeshPhongMaterial({ color: 0x888888 })
-    const backMesh = new THREE.Mesh(backGeo, backMat)
+    const backGeo  = new THREE.CircleGeometry(TUNNEL_R - 0.05, RADIAL_SEGS)
+    const backMesh = new THREE.Mesh(backGeo, new THREE.MeshPhongMaterial({ color: 0x888888 }))
     backMesh.position.y = -TBM_TOTAL_LEN
     backMesh.rotation.x = Math.PI
     tbmGroup.add(backMesh)
-
     scene.add(tbmGroup)
 
     // ── Centreline ────────────────────────────────────────────────────────
     const clGeo = new THREE.BufferGeometry().setFromPoints(alignPts.map(p => p.pos))
-    scene.add(new THREE.Line(clGeo, new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.3 })))
+    const centrelineMesh = new THREE.Line(clGeo, new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.3 }))
+    scene.add(centrelineMesh)
 
-    // ── Axes / scale helper ───────────────────────────────────────────────
-    const startPos = alignPts[0].pos
+    // ── Grid ──────────────────────────────────────────────────────────────
+    const startPos  = alignPts[0].pos
     const gridHelper = new THREE.GridHelper(500, 20, 0x1a2a3a, 0x1a2a3a)
     gridHelper.position.set(startPos.x, startPos.y - 5, startPos.z)
     scene.add(gridHelper)
@@ -242,11 +249,13 @@ export function ThreeDView({ data }: Props) {
 
     stateRef.current = {
       renderer, scene, camera, controls,
-      tbmGroup, coneLight,
-      excTube, futTube,
+      tbmGroup, tunnelGroup, ringGroup, terrainGroup, piezosGroup,
+      centrelineMesh, gridHelper,
+      coneLight, excTube, futTube,
       tubularSegs, alignPts,
       chMin, chMax, rafId,
       drillHolesMesh, drillHolesChainages,
+      initCamPos, initTarget,
     }
 
     return () => {
@@ -269,45 +278,45 @@ export function ThreeDView({ data }: Props) {
     const idx = findNearestIdx(s.alignPts, last.ch)
     const pt  = s.alignPts[idx]
 
-    // ── Position TBM group ──────────────────────────────────────────────
     s.tbmGroup.position.copy(pt.pos)
-    // Align group's +Y axis to tunnel forward direction
     const Y = new THREE.Vector3(0, 1, 0)
     if (Math.abs(pt.dir.dot(Y)) < 0.9999) {
       s.tbmGroup.quaternion.setFromUnitVectors(Y, pt.dir)
     }
-
-    // Point light follows TBM
     s.coneLight.position.copy(pt.pos)
 
-    // ── Update draw ranges ──────────────────────────────────────────────
     const excFrac = (last.ch - s.chMin) / (s.chMax - s.chMin)
     const excSegs = Math.round(Math.max(0, Math.min(1, excFrac)) * s.tubularSegs)
     const idxPerSeg = RADIAL_SEGS * 6
-
-    // Excavated tube: draw from 0 to excSegs
     s.excTube.geometry.setDrawRange(0, excSegs * idxPerSeg)
-    // Future tube: draw from excSegs to end
     s.futTube.geometry.setDrawRange(excSegs * idxPerSeg, s.tubularSegs * idxPerSeg)
 
-    // ── Drill holes: show only holes at or behind TBM chainage ──────────
     if (s.drillHolesMesh) {
       const visibleCount = s.drillHolesChainages.filter(ch => ch <= last.ch).length
       s.drillHolesMesh.geometry.setDrawRange(0, visibleCount * 2)
     }
-
   }, [currentTs, data])
+
+  // ── Toggle layer visibility ────────────────────────────────────────────────
+  useEffect(() => {
+    const s = stateRef.current
+    if (!s) return
+    s.tunnelGroup.visible    = threedLayers.tunnel
+    s.tbmGroup.visible       = threedLayers.tbm
+    s.ringGroup.visible      = threedLayers.rings
+    s.terrainGroup.visible   = threedLayers.terrain
+    s.piezosGroup.visible    = threedLayers.piezos
+    if (s.drillHolesMesh) s.drillHolesMesh.visible = threedLayers.drillholes
+  }, [threedLayers])
 
   // ── Theme change: update renderer background + fog ───────────────────────
   useEffect(() => {
     const s = stateRef.current
     if (!s) return
     const light = theme === 'light'
-    const bgColor  = light ? 0xe4eaf2 : 0x080a0e
-    const fogColor = light ? 0xd8e0ec : 0x0a0d14
-    s.renderer.setClearColor(bgColor)
+    s.renderer.setClearColor(light ? 0xe4eaf2 : 0x080a0e)
     if (s.scene.fog instanceof THREE.FogExp2) {
-      s.scene.fog.color.setHex(fogColor)
+      s.scene.fog.color.setHex(light ? 0xd8e0ec : 0x0a0d14)
     }
   }, [theme])
 
@@ -319,7 +328,6 @@ export function ThreeDView({ data }: Props) {
     const last = vis.length ? vis[vis.length - 1] : data.tbm[0]
     const idx  = findNearestIdx(s.alignPts, last.ch)
     const pt   = s.alignPts[idx]
-    // Move orbit controls target to TBM, offset camera to a nice side view
     s.controls.target.copy(pt.pos)
     s.camera.position.copy(pt.pos).add(
       pt.dir.clone().multiplyScalar(-80)
@@ -329,30 +337,70 @@ export function ThreeDView({ data }: Props) {
     s.controls.update()
   }, [zoomToTBMTick])
 
+  // ── Export 3D view as PNG ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (exportPNGTick === 0 || activeView !== '3d') return
+    const s = stateRef.current; if (!s) return
+    s.renderer.render(s.scene, s.camera)
+    const a = document.createElement('a')
+    a.href = s.renderer.domElement.toDataURL('image/png')
+    a.download = `3DView_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.png`
+    a.click()
+  }, [exportPNGTick])
+
   return (
-    <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
-      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
-      {!data && (
-        <div className={styles.loading}>LOADING 3D DATA…</div>
+    <div className={styles.wrap}>
+      {/* Left panel */}
+      <div className={`${styles.panelOverlay} ${panelOpen ? styles.open : ''}`}>
+        <ThreeDPanel />
+      </div>
+
+      {/* 3D canvas area — mountRef is just the bare canvas mount target */}
+      <div style={{ flex: 1, height: '100%', position: 'relative' }}>
+        <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+        {!data && <div className={styles.loading}>LOADING 3D DATA…</div>}
+        <div className={styles.hint}>DRAG TO ROTATE · SCROLL TO ZOOM · DOUBLE-CLICK RESET</div>
+        {/* Zoom controls */}
+        <div style={{ position:'absolute', top:12, right:12, display:'flex', flexDirection:'column', gap:3, zIndex:10 }}>
+          {([
+            ['+', () => { const s = stateRef.current; if (!s) return; const dir = s.camera.position.clone().sub(s.controls.target); s.camera.position.copy(s.controls.target).add(dir.multiplyScalar(0.6)); s.controls.update() }],
+            ['−', () => { const s = stateRef.current; if (!s) return; const dir = s.camera.position.clone().sub(s.controls.target); s.camera.position.copy(s.controls.target).add(dir.multiplyScalar(1.6)); s.controls.update() }],
+            ['⊡', () => { const s = stateRef.current; if (!s) return; s.camera.position.copy(s.initCamPos); s.controls.target.copy(s.initTarget); s.controls.update() }],
+          ] as [string, () => void][]).map(([label, fn], i) => (
+            <button key={i} onClick={fn} style={{
+              width:30, height:30, background:'var(--bg3)', border:'1px solid var(--border2)',
+              borderRadius:4, color:'var(--text)', fontSize: label==='⊡' ? 10 : 16,
+              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+              backdropFilter:'blur(4px)', fontFamily:'var(--mono)',
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile panel toggle */}
+      <button
+        className={styles.panelToggle}
+        onClick={() => setPanelOpen(o => !o)}
+        aria-label="Toggle panel"
+      >
+        {panelOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Tap-outside backdrop (mobile only) */}
+      {panelOpen && (
+        <div
+          className={styles.backdrop}
+          onClick={() => setPanelOpen(false)}
+          style={{ position: 'absolute', inset: 0, zIndex: 540, background: 'rgba(0,0,0,0.45)' }}
+        />
       )}
-      <div className={styles.hint}>
-        DRAG TO ROTATE · SCROLL TO ZOOM · DOUBLE-CLICK RESET
-      </div>
-      <div className={styles.legend}>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#00d4ff' }} />Tunnel</div>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#cccccc' }} />TBM</div>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: 'rgba(160,120,70,0.6)' }} />Soil</div>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: 'rgba(90,110,140,0.6)' }} />Rock</div>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#22c55e', opacity: 0.5 }} />Surface</div>
-        <div className={styles.legendRow}><div className={styles.swatch} style={{ background: '#f472b6' }} />Piezometers</div>
-      </div>
     </div>
   )
 }
 
 // ── Piezometer builder ────────────────────────────────────────────────────────
 function buildPiezometers(
-  scene: THREE.Scene,
+  group: THREE.Group,
   piezometers: import('../../types').PiezometerSensor[],
   e0: number,
   n0: number,
@@ -361,24 +409,21 @@ function buildPiezometers(
   const valid = piezometers.filter(p => p.easting && p.northing)
   if (!valid.length) return
 
-  // One sphere at surface + vertical line down to probe depth per piezometer
   for (const p of valid) {
     const x =  p.easting  - e0
     const z = -(p.northing - n0)
     const yTop    = p.elev
     const yBottom = p.elev - p.depth
 
-    // Vertical rod
     const pts = [new THREE.Vector3(x, yTop, z), new THREE.Vector3(x, yBottom, z)]
     const lineGeo = new THREE.BufferGeometry().setFromPoints(pts)
-    scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: PINK, transparent: true, opacity: 0.7 })))
+    group.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: PINK, transparent: true, opacity: 0.7 })))
 
-    // Sphere at surface
     const sGeo = new THREE.SphereGeometry(1.2, 8, 6)
     const sMat = new THREE.MeshBasicMaterial({ color: PINK, transparent: true, opacity: 0.85 })
     const sphere = new THREE.Mesh(sGeo, sMat)
     sphere.position.set(x, yTop, z)
-    scene.add(sphere)
+    group.add(sphere)
   }
 }
 
@@ -396,7 +441,6 @@ function buildDrillHoles(
   const DEG8_RAD = 8 * Math.PI / 180
   const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
-  // Inleakage → RGB  (0=white, 1=light-blue, 10=blue, 50=dark-blue)
   const COLOR_STOPS: [number, [number, number, number]][] = [
     [0,  [1,     1,     1    ]],
     [1,  [0.678, 0.847, 0.902]],
@@ -419,21 +463,17 @@ function buildDrillHoles(
     return COLOR_STOPS[COLOR_STOPS.length - 1][1]
   }
 
-  // Sort holes by chainage so setDrawRange gives contiguous "up to TBM" slices
   const sorted = [...active].sort((a, b) => a.advance - b.advance)
-
   const positions:  number[] = []
   const colors:     number[] = []
-  const chainages:  number[] = []   // one entry per hole, parallel to vertex pairs
+  const chainages:  number[] = []
 
   for (const hole of sorted) {
-    // Advance is an index into the alignment array; clamp to valid range
     const advIdx = Math.max(0, Math.min(Math.round(hole.advance), alignment.length - 1))
     const al     = alignment[advIdx]
     const alPrev = alignment[Math.max(0, advIdx - 1)]
     const alNext = alignment[Math.min(alignment.length - 1, advIdx + 1)]
 
-    // 3D positions for direction computation
     const posPrev = alignVec3(alPrev.easting, alPrev.northing, alPrev.tunnelElev, e0, n0)
     const posNext = alignVec3(alNext.easting, alNext.northing, alNext.tunnelElev, e0, n0)
     const pos     = alignVec3(al.easting,     al.northing,     al.tunnelElev,     e0, n0)
@@ -443,17 +483,14 @@ function buildDrillHoles(
     if (right_cs.lengthSq() < 0.0001) right_cs.set(1, 0, 0)
     const up_cs = new THREE.Vector3().crossVectors(right_cs, fwd).normalize()
 
-    // Angular position: hole 1 = 7.5° from top, clockwise looking from behind
     const angleRad = (7.5 + (hole.holeNo - 1) * 15) * Math.PI / 180
     const radial = right_cs.clone().multiplyScalar(Math.sin(angleRad))
                      .add(up_cs.clone().multiplyScalar(Math.cos(angleRad)))
 
-    // Start: 6 m behind advance, at the tunnel wall (radially offset by tunnel radius)
     const start = pos.clone()
       .sub(fwd.clone().multiplyScalar(6))
       .add(radial.clone().multiplyScalar(TUNNEL_R))
 
-    // Drill direction: forward + 8° outward
     const holeDir = fwd.clone().multiplyScalar(Math.cos(DEG8_RAD))
                       .add(radial.clone().multiplyScalar(Math.sin(DEG8_RAD)))
                       .normalize()
@@ -471,7 +508,7 @@ function buildDrillHoles(
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3))
-  geo.setDrawRange(0, 0)   // start hidden; currentTs effect will set correct range
+  geo.setDrawRange(0, 0)
 
   const mat  = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 })
   const mesh = new THREE.LineSegments(geo, mat)
@@ -481,16 +518,13 @@ function buildDrillHoles(
 
 // ── Terrain strip builder ──────────────────────────────────────────────────────
 function buildTerrainStrip(
-  scene: THREE.Scene,
+  group: THREE.Group,
   alignPts: { pos: THREE.Vector3; perp: THREE.Vector3; surf: number; soil: number }[]
 ) {
   const N = alignPts.length
   if (N < 2) return
 
-  // Helper: build a quad strip mesh between two elevation tracks
   function buildStrip(
-    getY0: (i: number) => number,   // left-edge Y at point i
-    getY1: (i: number) => number,   // right-edge Y at point i
     leftElev:  (i: number) => number,
     rightElev: (i: number) => number,
     color: number,
@@ -521,31 +555,23 @@ function buildTerrainStrip(
     const mat = new THREE.MeshPhongMaterial({
       color, transparent: true, opacity, side, depthWrite: opacity > 0.5,
     })
-    scene.add(new THREE.Mesh(geo, mat))
+    group.add(new THREE.Mesh(geo, mat))
   }
 
-  // ── Surface (green grass level) ─────────────────────────────────────
+  // Surface (green grass level)
   buildStrip(
-    i => alignPts[i].surf, i => alignPts[i].surf,
     i => alignPts[i].surf, i => alignPts[i].surf,
     0x1a4a1a, 0.75
   )
 
-  // ── Soil layer (surface → soil/rock contact) ────────────────────────
-  buildStrip(
-    i => alignPts[i].surf,  i => alignPts[i].surf,
-    i => alignPts[i].surf,  i => alignPts[i].surf,
-    0x8b6020, 0.0  // top of soil already covered by surface
-  )
-  // Soil body (surface top → soil base bottom)
+  // Soil body
   {
-    const verts = new Float32Array(N * 4 * 3)  // 4 verts per cross-section
+    const verts = new Float32Array(N * 4 * 3)
     const idx: number[] = []
     for (let i = 0; i < N; i++) {
       const p     = alignPts[i]
       const left  = p.perp.clone().multiplyScalar(-TERRAIN_HW)
       const right = p.perp.clone().multiplyScalar(TERRAIN_HW)
-      // v0: left at surf, v1: right at surf, v2: right at soil, v3: left at soil
       const surf = alignPts[i].surf
       const soil = Math.min(alignPts[i].soil, surf)
       const pts4 = [
@@ -563,10 +589,8 @@ function buildTerrainStrip(
           const a = i*4+j, b = i*4+(j+1)%4, c = (i+1)*4+j, d = (i+1)*4+(j+1)%4
           if (j < 3) idx.push(a, c, b, b, c, d)
         }
-        // Top face (surface level)
         const a = i*4, b = i*4+1, c = (i+1)*4, d = (i+1)*4+1
         idx.push(a, b, c, b, d, c)
-        // Bottom face (soil base level)
         const e = i*4+3, f = i*4+2, g = (i+1)*4+3, h = (i+1)*4+2
         idx.push(e, g, f, f, g, h)
       }
@@ -575,19 +599,12 @@ function buildTerrainStrip(
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
     geo.setIndex(idx)
     geo.computeVertexNormals()
-    scene.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    group.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
       color: 0x8b6020, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false,
     })))
   }
 
-  // ── Rock layer (soil base → tunnel axis level) ──────────────────────
-  buildStrip(
-    i => Math.min(alignPts[i].soil, alignPts[i].surf),
-    i => Math.min(alignPts[i].soil, alignPts[i].surf),
-    i => Math.min(alignPts[i].soil, alignPts[i].surf),
-    i => Math.min(alignPts[i].soil, alignPts[i].surf),
-    0x5a7080, 0.0
-  )
+  // Rock body
   {
     const verts = new Float32Array(N * 4 * 3)
     const idx: number[] = []
@@ -596,7 +613,7 @@ function buildTerrainStrip(
       const left  = p.perp.clone().multiplyScalar(-TERRAIN_HW)
       const right = p.perp.clone().multiplyScalar(TERRAIN_HW)
       const soil  = Math.min(alignPts[i].soil, alignPts[i].surf)
-      const rock  = alignPts[i].pos.y - TUNNEL_R - 2  // just below tunnel
+      const rock  = alignPts[i].pos.y - TUNNEL_R - 2
       const pts4  = [
         p.pos.clone().setY(soil).add(left),
         p.pos.clone().setY(soil).add(right),
@@ -620,13 +637,13 @@ function buildTerrainStrip(
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
     geo.setIndex(idx)
     geo.computeVertexNormals()
-    scene.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    group.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
       color: 0x4a6070, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false,
     })))
   }
 
-  // ── Surface edge line (green) ───────────────────────────────────────
+  // Surface edge line (green)
   const surfPts = alignPts.map(p => p.pos.clone().setY(p.surf))
   const surfGeo = new THREE.BufferGeometry().setFromPoints(surfPts)
-  scene.add(new THREE.Line(surfGeo, new THREE.LineBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.7 })))
+  group.add(new THREE.Line(surfGeo, new THREE.LineBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.7 })))
 }

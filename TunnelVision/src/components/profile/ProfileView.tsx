@@ -27,6 +27,8 @@ export function ProfileView({ data }: Props) {
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const theme             = useStore(s => s.theme)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
+  const exportPNGTick     = useStore(s => s.exportPNGTick)
+  const activeView        = useStore(s => s.activeView)
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const wrapRef    = useRef<HTMLDivElement>(null)
@@ -227,10 +229,11 @@ export function ProfileView({ data }: Props) {
           ctx.fill(); ctx.stroke()
           curCh -= len
         }
+        // cutterhead face ring only (no filled circle)
         const r = Math.abs(cy(tunEl - TUNNEL_R) - cy(tunEl + TUNNEL_R)) / 2
         ctx.beginPath(); ctx.arc(cx(last.ch), cy(tunEl), r, 0, Math.PI * 2)
-        ctx.fillStyle = '#111111'; ctx.strokeStyle = '#444'; ctx.lineWidth = 1
-        ctx.fill(); ctx.stroke()
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 1.5
+        ctx.stroke()
       }
     }
   }, [data, currentTs, profChannel, profLayers, vExag, theme, paramDef])
@@ -284,6 +287,17 @@ export function ProfileView({ data }: Props) {
     viewRef.current = { ...viewRef.current, chMin: last.ch - 400, chMax: last.ch + 400 }
     draw()
   }, [zoomToTBMTick])
+
+  useEffect(() => {
+    if (exportPNGTick === 0 || activeView !== 'profile') return
+    const canvas = canvasRef.current; if (!canvas) return
+    const v = viewRef.current
+    const fmt = (ch: number) => String(Math.round(ch))
+    const a = document.createElement('a')
+    a.href = canvas.toDataURL('image/png')
+    a.download = `Profile_CH${fmt(v.chMin)}-${fmt(v.chMax)}.png`
+    a.click()
+  }, [exportPNGTick])
 
   function onWheel(e: React.WheelEvent) {
     e.preventDefault()
@@ -426,6 +440,33 @@ export function ProfileView({ data }: Props) {
               <div className={styles.ttHint}>Click to open chart</div>
             </div>
           )}
+
+          {/* Zoom controls */}
+          <div style={{ position:'absolute', top:10, right:10, display:'flex', flexDirection:'column', gap:3, zIndex:10 }}>
+            {([
+              ['+', () => {
+                const v = viewRef.current; const span = v.chMax - v.chMin; const mid = (v.chMin+v.chMax)/2
+                viewRef.current = { ...v, chMin: mid-span*0.42, chMax: mid+span*0.42 }; draw()
+              }],
+              ['−', () => {
+                const v = viewRef.current; const span = v.chMax - v.chMin; const mid = (v.chMin+v.chMax)/2
+                const newSpan = Math.min(11100, span*1.4)
+                viewRef.current = { ...v, chMin: mid-newSpan/2, chMax: mid+newSpan/2 }; draw()
+              }],
+              ['⊡', () => {
+                if (!data?.profile.length) return
+                const pts = data.profile
+                viewRef.current = { ...viewRef.current, chMin: pts[0].ch, chMax: pts[pts.length-1].ch }; draw()
+              }],
+            ] as [string, () => void][]).map(([label, fn], i) => (
+              <button key={i} onClick={fn} style={{
+                width:30, height:30, background:'var(--bg3)', border:'1px solid var(--border2)',
+                borderRadius:4, color:'var(--text)', fontSize: label==='⊡' ? 10 : 16,
+                cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+                fontFamily:'var(--mono)',
+              }}>{label}</button>
+            ))}
+          </div>
 
           {/* Vertical exaggeration slider */}
           <div className={styles.vExagWrap}>

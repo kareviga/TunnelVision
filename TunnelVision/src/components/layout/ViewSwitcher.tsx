@@ -5,12 +5,14 @@ const TABS: { id: ViewId; label: string }[] = [
   { id: 'map',     label: 'Map View' },
   { id: 'profile', label: 'Profile View' },
   { id: '3d',      label: '3D View' },
-  { id: 'graphs',  label: 'Graphs' },
 ]
 
+const PNG_VIEWS: ViewId[] = ['map', 'profile', '3d']
+
 export function ViewSwitcher() {
-  const activeView = useStore(s => s.activeView)
-  const setView    = useStore(s => s.setView)
+  const activeView      = useStore(s => s.activeView)
+  const setView         = useStore(s => s.setView)
+  const triggerExportPNG = useStore(s => s.triggerExportPNG)
 
   return (
     <div className={styles.switcher}>
@@ -23,6 +25,15 @@ export function ViewSwitcher() {
           {tab.label}
         </button>
       ))}
+      {PNG_VIEWS.includes(activeView) && (
+        <button
+          className={styles.pngBtn}
+          onClick={triggerExportPNG}
+          title="Export current view as PNG"
+        >
+          ↓ PNG
+        </button>
+      )}
     </div>
   )
 }

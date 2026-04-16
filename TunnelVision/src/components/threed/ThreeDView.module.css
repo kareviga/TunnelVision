@@ -2,8 +2,7 @@
   flex: 1;
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
   background: var(--bg);
 }
 
@@ -18,6 +17,16 @@
   pointer-events: none;
   letter-spacing: 2px;
   white-space: nowrap;
+}
+
+.loading {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text3);
+  letter-spacing: 2px;
 }
 
 .placeholder {
@@ -47,4 +56,49 @@
   font-size: 12px;
   color: var(--text3);
   line-height: 1.6;
+}
+
+/* ── Panel overlay ─────────────────────────────────────────────────────────── */
+.panelOverlay {
+  flex-shrink: 0;
+}
+
+/* ── Mobile toggle ─────────────────────────────────────────────────────────── */
+.panelToggle { display: none; }
+.backdrop    { display: none; }
+
+@media (max-width: 640px) {
+  .backdrop { display: block; }
+
+  .panelToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 600;
+    width: 36px;
+    height: 36px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 16px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+
+  .panelOverlay {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    z-index: 550;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.6);
+  }
+
+  .panelOverlay.open {
+    transform: translateX(0);
+  }
 }

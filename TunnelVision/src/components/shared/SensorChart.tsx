@@ -387,6 +387,7 @@ export function SensorChart({ data }: Props) {
   const clearPiezAnnotation = useStore(s => s.clearPiezAnnotation)
   const theme               = useStore(s => s.theme)
   const canvasRef           = useRef<HTMLCanvasElement>(null)
+  const exportContainerRef  = useRef<HTMLDivElement>(null)
 
   const [annotMode, setAnnotMode] = useState<AnnotMode>(null)
 
@@ -674,7 +675,7 @@ export function SensorChart({ data }: Props) {
   if (!selectedSensor) return null
 
   // ── Export chart as PNG ────────────────────────────────────────────────────
-  function exportPNG() {
+  async function exportPNG() {
     const canvas = canvasRef.current
     if (!canvas) return
     const fmt = (ts: number) => {
@@ -686,10 +687,27 @@ export function SensorChart({ data }: Props) {
       : `MAN${selectedSensor!.id}`
     const { min, max } = viewRef.current
     const name = `${id}_${fmt(min)}_${fmt(max)}.png`
-    const a = document.createElement('a')
-    a.href = canvas.toDataURL('image/png')
-    a.download = name
-    a.click()
+
+    // If annotation table is present, use html2canvas on the combined container
+    const container = exportContainerRef.current
+    const hasTable = isPiez && hasAnnot && container
+    if (hasTable) {
+      const html2canvas = (await import('html2canvas')).default
+      const exported = await html2canvas(container, {
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg2').trim() || '#0d1117',
+        scale: window.devicePixelRatio || 1,
+        useCORS: true,
+      })
+      const a = document.createElement('a')
+      a.href = exported.toDataURL('image/png')
+      a.download = name
+      a.click()
+    } else {
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = name
+      a.click()
+    }
   }
 
   const title = sensor
@@ -786,7 +804,8 @@ export function SensorChart({ data }: Props) {
           </div>
         </div>
 
-        {/* Canvas chart */}
+        {/* Canvas chart + table wrapped for export */}
+        <div ref={exportContainerRef}>
         <div style={{ position: 'relative' }}>
           <canvas
             ref={canvasRef}
@@ -891,6 +910,7 @@ export function SensorChart({ data }: Props) {
             </table>
           </div>
         )}
+        </div>{/* end exportContainerRef */}
       </div>
     </div>
   )

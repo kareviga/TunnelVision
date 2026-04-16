@@ -26,7 +26,24 @@
 .tab:hover { color: var(--text2); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+.pngBtn {
+  margin-left: auto;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  cursor: pointer;
+  align-self: center;
+  letter-spacing: 0.5px;
+  transition: color .15s, border-color .15s;
+}
+.pngBtn:hover { color: var(--accent); border-color: var(--accent); }
+
 @media (max-width: 640px) {
   .switcher { padding: 0; }
   .tab      { flex: 1; padding: 9px 4px; font-size: 11px; letter-spacing: 1px; text-align: center; }
+  .pngBtn   { padding: 5px 8px; font-size: 10px; }
 }

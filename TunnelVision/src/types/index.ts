@@ -263,6 +263,8 @@ export type LayerKey = 'tunnel' | 'center' | 'markers' | 'rings' | 'grout' | 'pi
 export type ProfParam = 'fpi' | 'thrust' | 'torque' | 'pen_hr'
 export type ProfLayerKey = 'grout' | 'mano' | 'soil' | 'rock'
 
+export type ThreeDLayerKey = 'tunnel' | 'tbm' | 'rings' | 'terrain' | 'piezos' | 'drillholes'
+
 // ── Param catalogue entry ─────────────────────────────────────────────────────
 
 export interface ParamDef {
