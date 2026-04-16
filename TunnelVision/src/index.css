@@ -86,3 +86,14 @@ body {
 /* ── Pulse animation ────────────────────────────────────────────────────────── */
 @keyframes pulse    { 0%,100% { opacity:1 } 50% { opacity:.3 } }
 @keyframes tbmp     { 0%,100% { transform:scale(1);opacity:.7 } 50% { transform:scale(1.8);opacity:0 } }
+
+/* ── Print styles (Reports view) ────────────────────────────────────────────── */
+@media print {
+  body { background: #fff; color: #000; overflow: visible; height: auto; }
+  #root { height: auto; overflow: visible; }
+  header, nav, [class*="switcher"], [class*="sidebar"], [class*="DateBar"],
+  [class*="exportRow"], [class*="exportBtn"], [class*="generateBtn"] { display: none !important; }
+  [class*="page"] { display: block; }
+  [class*="main"] { overflow: visible; padding: 0; }
+  [class*="report"] { max-width: 100%; }
+}
