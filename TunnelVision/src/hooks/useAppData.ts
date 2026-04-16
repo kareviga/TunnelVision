@@ -181,7 +181,9 @@ export function useAppData() {
             if (!al) return null
             return {
               ch: r.chainage, ring: r.ring, lat: al.lat, lon: al.lon, dir: al.tunnel_dir,
-              S: r.S ?? 0, U: r.U ?? 0, NP_AP: r['NP:AP' as keyof XRFRow] as number ?? 0,
+              S: (r.S ?? (r as unknown as Record<string,number>)[' S'] ?? 0),
+              U: (r.U ?? (r as unknown as Record<string,number>)[' U'] ?? 0),
+              NP_AP: r['NP:AP' as keyof XRFRow] as number ?? 0,
               Fe_S: r['Fe:S' as keyof XRFRow] as number ?? 0,
               Ca: r.Ca ?? 0, Fe: r.Fe ?? 0, Al: r.Al ?? 0,
               K: r.K ?? 0, Si: r.Si ?? 0, Ti: r.Ti ?? 0, Mg: r.Mg ?? 0,
