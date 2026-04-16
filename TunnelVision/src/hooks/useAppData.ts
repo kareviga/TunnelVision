@@ -42,14 +42,6 @@ async function loadCSV<T>(url: string, opts?: Papa.ParseConfig): Promise<T[]> {
 // Sensors split across time periods have " Geosense" / "-Geosense" suffix variants
 // which we normalise to the base name so series are merged automatically.
 
-function parsePiezoDate(s: string): number {
-  // "YYYY-MM-DD HH:MM:SS" → unix seconds
-  if (!s) return 0
-  const t = s.trim().replace(' ', 'T')
-  const ms = new Date(t).getTime()
-  return isNaN(ms) ? 0 : Math.floor(ms / 1000)
-}
-
 function normaliseSensorName(name: string): string {
   // "15-1 Geosense" → "15-1",  "190-Geosense" → "190"
   return name.replace(/[\s-]*Geosense$/i, '').trim()
@@ -60,17 +52,17 @@ async function loadPiezoData(url: string): Promise<Map<string, Array<[number, nu
     Papa.parse(url, {
       download: true,
       header: true,
-      delimiter: ',',
       skipEmptyLines: true,
       dynamicTyping: false,
       complete: (result) => {
         const seriesMap = new Map<string, Array<[number, number]>>()
         for (const row of result.data as Array<Record<string, string>>) {
-          const rawName = row['Location name']?.trim()
-          const dateStr = row['Datetime']?.trim()
+          // Support both old format (Datetime/Location name) and new format (Date/Piezo_ID)
+          const rawName = (row['Piezo_ID'] ?? row['Location name'])?.trim()
+          const dateStr = (row['Date'] ?? row['Datetime'])?.trim()
           const valStr  = row['Pressure_kPa']?.trim()
           if (!rawName || !dateStr || !valStr) continue
-          const ts  = parsePiezoDate(dateStr)
+          const ts  = parseDateStr(dateStr)
           const val = parseFloat(valStr)
           if (!ts || isNaN(val)) continue
           const name = normaliseSensorName(rawName)
