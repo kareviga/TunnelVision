@@ -54,9 +54,9 @@ interface SceneState {
   chMin: number
   chMax: number
   rafId: number
-  drillHolesMesh:      THREE.InstancedMesh | null
+  drillHolesMesh:      THREE.LineSegments | null
   drillHolesChainages: number[]
-  drillHoleHitSpheres: THREE.Mesh[]
+  drillHoleStartPts:   { pos: THREE.Vector3; holeNo: number; length: number; inleakage: number }[]
   initCamPos:     THREE.Vector3
   initTarget:     THREE.Vector3
 }
@@ -221,14 +221,14 @@ export function ThreeDView({ data }: Props) {
     scene.add(piezosGroup)
 
     // ── Drill holes ───────────────────────────────────────────────────────
-    let drillHolesMesh: THREE.InstancedMesh | null = null
+    let drillHolesMesh: THREE.LineSegments | null = null
     let drillHolesChainages: number[] = []
-    let drillHoleHitSpheres: THREE.Mesh[] = []
+    let drillHoleStartPts: { pos: THREE.Vector3; holeNo: number; length: number; inleakage: number }[] = []
     if (data.drillHoles?.length) {
       const result = buildDrillHoles(scene, data.drillHoles, data.alignment, e0, n0)
       drillHolesMesh = result.mesh
       drillHolesChainages = result.chainages
-      drillHoleHitSpheres = result.hitSpheres
+      drillHoleStartPts = result.startPts
     }
 
     // ── TBM group ─────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ export function ThreeDView({ data }: Props) {
       coneLight, excTube, futTube,
       tubularSegs, alignPts,
       chMin, chMax, rafId,
-      drillHolesMesh, drillHolesChainages, drillHoleHitSpheres,
+      drillHolesMesh, drillHolesChainages, drillHoleStartPts,
       initCamPos, initTarget,
     }
 
@@ -324,8 +324,7 @@ export function ThreeDView({ data }: Props) {
 
     if (s.drillHolesMesh) {
       const visibleCount = s.drillHolesChainages.filter(ch => ch <= last.ch).length
-      s.drillHolesMesh.count = visibleCount
-      s.drillHoleHitSpheres.forEach((sp, i) => { sp.visible = i < visibleCount })
+      s.drillHolesMesh.geometry.setDrawRange(0, visibleCount * 2)
     }
   }, [currentTs, data])
 
@@ -339,7 +338,6 @@ export function ThreeDView({ data }: Props) {
     s.terrainGroup.visible   = threedLayers.terrain
     s.piezosGroup.visible    = threedLayers.piezos
     if (s.drillHolesMesh) s.drillHolesMesh.visible = threedLayers.drillholes
-    if (!threedLayers.drillholes) s.drillHoleHitSpheres.forEach(sp => { sp.visible = false })
   }, [threedLayers])
 
   // ── Theme change: update renderer background + fog ───────────────────────
@@ -388,61 +386,74 @@ export function ThreeDView({ data }: Props) {
     const canvas = scene.renderer.domElement
     const raycaster = new THREE.Raycaster()
 
+    const DRILL_HIT_PX = 14  // screen-space radius in pixels for drill hole hover
+
     function onMouseMove(e: MouseEvent) {
       if (measuring3DRef.current) { setPiezoTooltip(null); setDrillTooltip(null); return }
-      const hit = getHit(e)
-      if (!hit) { setPiezoTooltip(null); setDrillTooltip(null); return }
-      const ud = hit.object.userData
-      if (ud?.type === 'piezo') {
-        setDrillTooltip(null)
-        const p = dataRef.current?.piezometers.find(p => p.id === ud.id)
-        if (!p) { setPiezoTooltip(null); return }
-        const recent = p.series.filter(s => s[0] <= currentTsRef.current).at(-1)
-        setPiezoTooltip({
-          x: e.clientX, y: e.clientY,
-          id: p.id, sensorName: p.sensorName,
-          method: p.method, depth: p.depth, soilClass: p.soilClass,
-          pressure: recent ? recent[1] : null,
-          hasSeries: p.series.length > 0,
-        })
-      } else if (ud?.type === 'drillhole') {
-        setPiezoTooltip(null)
-        setDrillTooltip({ x: e.clientX, y: e.clientY, holeNo: ud.holeNo, length: ud.length, inleakage: ud.inleakage })
-      } else {
-        setPiezoTooltip(null); setDrillTooltip(null)
+      const rect = canvas.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+      const ndc = new THREE.Vector2((mx / rect.width) * 2 - 1, (my / rect.height) * -2 + 1)
+
+      // Piezometer raycasting (sphere meshes — reliable)
+      raycaster.setFromCamera(ndc, scene.camera)
+      if (scene.piezosGroup.visible) {
+        const piezHits = raycaster.intersectObjects(scene.piezosGroup.children, true)
+          .filter(h => h.object.userData?.type === 'piezo')
+        if (piezHits.length) {
+          setDrillTooltip(null)
+          const ud = piezHits[0].object.userData
+          const p = dataRef.current?.piezometers.find(p => p.id === ud.id)
+          if (!p) { setPiezoTooltip(null); return }
+          const recent = p.series.filter(s => s[0] <= currentTsRef.current).at(-1)
+          setPiezoTooltip({
+            x: e.clientX, y: e.clientY,
+            id: p.id, sensorName: p.sensorName,
+            method: p.method, depth: p.depth, soilClass: p.soilClass,
+            pressure: recent ? recent[1] : null,
+            hasSeries: p.series.length > 0,
+          })
+          return
+        }
       }
+      setPiezoTooltip(null)
+
+      // Drill hole hover via screen-space proximity (no extra scene objects needed)
+      if (scene.drillHolesMesh?.visible) {
+        const visCount = scene.drillHolesMesh.geometry.drawRange.count / 2
+        let best: typeof scene.drillHoleStartPts[0] | null = null
+        let bestDist = DRILL_HIT_PX * DRILL_HIT_PX
+        const proj = new THREE.Vector3()
+        for (let i = 0; i < Math.min(visCount, scene.drillHoleStartPts.length); i++) {
+          proj.copy(scene.drillHoleStartPts[i].pos).project(scene.camera)
+          const sx = (proj.x * 0.5 + 0.5) * rect.width
+          const sy = (-proj.y * 0.5 + 0.5) * rect.height
+          const d2 = (sx - mx) ** 2 + (sy - my) ** 2
+          if (d2 < bestDist) { bestDist = d2; best = scene.drillHoleStartPts[i] }
+        }
+        if (best) {
+          setDrillTooltip({ x: e.clientX, y: e.clientY, holeNo: best.holeNo, length: best.length, inleakage: best.inleakage })
+          return
+        }
+      }
+      setDrillTooltip(null)
     }
 
-    function getHit(e: MouseEvent) {
+    function onClick(e: MouseEvent) {
+      if (measuring3DRef.current) return
+      if (!scene.piezosGroup.visible) return
       const rect = canvas.getBoundingClientRect()
       const ndc = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width)  *  2 - 1,
         ((e.clientY - rect.top)  / rect.height) * -2 + 1,
       )
       raycaster.setFromCamera(ndc, scene.camera)
-      // Check piezos
-      const piezHits = raycaster.intersectObjects(scene.piezosGroup.children, true)
-        .filter(h => h.object.userData?.type === 'piezo' && scene.piezosGroup.visible)
-      if (piezHits.length) return piezHits[0]
-      // Check drill hole hit spheres
-      const visibleHitSpheres = scene.drillHoleHitSpheres.filter(s => s.visible)
-      if (visibleHitSpheres.length) {
-        const dhHits = raycaster.intersectObjects(visibleHitSpheres, false)
-          .filter(h => h.object.userData?.type === 'drillhole')
-        if (dhHits.length) return dhHits[0]
-      }
-      return null
-    }
-
-    function onClick(e: MouseEvent) {
-      if (measuring3DRef.current) return
-      const hit = getHit(e)
-      if (!hit) return
-      const ud = hit.object.userData
-      if (ud?.type === 'piezo') {
-        const p = dataRef.current?.piezometers.find(p => p.id === ud.id)
-        if (p?.series.length) setSelectedSensor({ type: 'piezometer', id: ud.id })
-      }
+      const hits = raycaster.intersectObjects(scene.piezosGroup.children, true)
+        .filter(h => h.object.userData?.type === 'piezo')
+      if (!hits.length) return
+      const ud = hits[0].object.userData
+      const p = dataRef.current?.piezometers.find(p => p.id === ud.id)
+      if (p?.series.length) setSelectedSensor({ type: 'piezometer', id: ud.id })
     }
 
     canvas.addEventListener('mousemove', onMouseMove)
@@ -669,37 +680,40 @@ function buildDrillHoles(
   alignment: import('../../types').AlignPoint[],
   e0: number,
   n0: number,
-): { mesh: THREE.InstancedMesh | null; chainages: number[]; hitSpheres: THREE.Mesh[] } {
+): { mesh: THREE.LineSegments | null; chainages: number[]; startPts: { pos: THREE.Vector3; holeNo: number; length: number; inleakage: number }[] } {
   const active = drillHoles.filter(h => h.length > 0)
-  if (!active.length || alignment.length < 2) return { mesh: null, chainages: [], hitSpheres: [] }
+  if (!active.length || alignment.length < 2) return { mesh: null, chainages: [], startPts: [] }
 
   const DEG8_RAD = 8 * Math.PI / 180
   const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
-  const COLOR_STOPS: [number, THREE.Color][] = [
-    [0,  new THREE.Color(1,     1,     1    )],
-    [1,  new THREE.Color(0.678, 0.847, 0.902)],
-    [10, new THREE.Color(0.118, 0.392, 0.863)],
-    [50, new THREE.Color(0.020, 0.039, 0.314)],
+  const COLOR_STOPS: [number, [number, number, number]][] = [
+    [0,  [1,     1,     1    ]],
+    [1,  [0.678, 0.847, 0.902]],
+    [10, [0.118, 0.392, 0.863]],
+    [50, [0.020, 0.039, 0.314]],
   ]
 
-  function lerpColor(v: number): THREE.Color {
+  function lerpColor(v: number): [number, number, number] {
     const val = Math.max(0, v)
     for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
       if (val <= COLOR_STOPS[i + 1][0]) {
         const t = (val - COLOR_STOPS[i][0]) / (COLOR_STOPS[i + 1][0] - COLOR_STOPS[i][0])
-        return new THREE.Color().lerpColors(COLOR_STOPS[i][1], COLOR_STOPS[i + 1][1], t)
+        return [
+          COLOR_STOPS[i][1][0] + t * (COLOR_STOPS[i+1][1][0] - COLOR_STOPS[i][1][0]),
+          COLOR_STOPS[i][1][1] + t * (COLOR_STOPS[i+1][1][1] - COLOR_STOPS[i][1][1]),
+          COLOR_STOPS[i][1][2] + t * (COLOR_STOPS[i+1][1][2] - COLOR_STOPS[i][1][2]),
+        ]
       }
     }
-    return COLOR_STOPS[COLOR_STOPS.length - 1][1].clone()
+    return COLOR_STOPS[COLOR_STOPS.length - 1][1]
   }
 
   const sorted = [...active].sort((a, b) => a.advance - b.advance)
+  const positions: number[] = []
+  const colors:    number[] = []
   const chainages: number[] = []
-  const hitSpheres: THREE.Mesh[] = []
-
-  interface HoleGeom { start: THREE.Vector3; dir: THREE.Vector3; length: number; color: THREE.Color }
-  const holes: HoleGeom[] = []
+  const startPts:  { pos: THREE.Vector3; holeNo: number; length: number; inleakage: number }[] = []
 
   for (const hole of sorted) {
     const advIdx = Math.max(0, Math.min(Math.round(hole.advance), alignment.length - 1))
@@ -728,53 +742,25 @@ function buildDrillHoles(
                       .add(radial.clone().multiplyScalar(Math.sin(DEG8_RAD)))
                       .normalize()
 
-    holes.push({ start, dir: holeDir, length: hole.length, color: lerpColor(hole.inleakage) })
+    const end = start.clone().add(holeDir.multiplyScalar(hole.length))
+    const [r, g, b] = lerpColor(hole.inleakage)
+    positions.push(start.x, start.y, start.z, end.x, end.y, end.z)
+    colors.push(r, g, b, r, g, b)
     chainages.push(al.ch)
-
-    // Invisible hit sphere for raycasting
-    const sp = new THREE.Mesh(
-      new THREE.SphereGeometry(1.8, 6, 4),
-      new THREE.MeshBasicMaterial({ visible: false, depthTest: false }),
-    )
-    sp.position.copy(start)
-    sp.visible = false
-    sp.userData = { type: 'drillhole', holeNo: hole.holeNo, length: hole.length, inleakage: hole.inleakage }
-    scene.add(sp)
-    hitSpheres.push(sp)
+    startPts.push({ pos: start.clone(), holeNo: hole.holeNo, length: hole.length, inleakage: hole.inleakage })
   }
 
-  if (!holes.length) return { mesh: null, chainages: [], hitSpheres: [] }
+  if (!positions.length) return { mesh: null, chainages: [], startPts: [] }
 
-  // Unit cylinder aligned along Y axis — radius 0.18 m gives visible thickness when zoomed in
-  const cylGeo = new THREE.CylinderGeometry(0.18, 0.18, 1, 6)
-  const cylMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9 })
-  const mesh = new THREE.InstancedMesh(cylGeo, cylMat, holes.length)
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(holes.length * 3), 3)
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3))
+  geo.setDrawRange(0, 0)
 
-  const dummy = new THREE.Object3D()
-  const Y_AXIS = new THREE.Vector3(0, 1, 0)
-  for (let i = 0; i < holes.length; i++) {
-    const { start, dir, length, color } = holes[i]
-    const mid = start.clone().add(dir.clone().multiplyScalar(length / 2))
-    dummy.position.copy(mid)
-    // Align Y to drill direction
-    if (Math.abs(dir.dot(Y_AXIS)) < 0.9999) {
-      dummy.quaternion.setFromUnitVectors(Y_AXIS, dir)
-    } else {
-      dummy.quaternion.identity()
-      if (dir.y < 0) dummy.rotation.z = Math.PI
-    }
-    dummy.scale.set(1, length, 1)
-    dummy.updateMatrix()
-    mesh.setMatrixAt(i, dummy.matrix)
-    mesh.setColorAt(i, color)
-  }
-  mesh.instanceMatrix.needsUpdate = true
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  mesh.count = 0   // start hidden; updated by currentTs effect
+  const mat  = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 })
+  const mesh = new THREE.LineSegments(geo, mat)
   scene.add(mesh)
-
-  return { mesh, chainages, hitSpheres }
+  return { mesh, chainages, startPts }
 }
 
 // ── Terrain strip builder ──────────────────────────────────────────────────────
