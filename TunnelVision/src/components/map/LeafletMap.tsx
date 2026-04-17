@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import L from 'leaflet'
 import { useStore } from '../../store/useStore'
 import { off, TUNNEL_R, TBM_W } from '../../utils/geo'
@@ -88,6 +88,51 @@ export function LeafletMap({ data }: Props) {
   const piezAnnotations   = useStore(s => s.piezAnnotations)
   const isActive          = activeView === 'map'
   const setStore          = useStore
+
+  // ── Measure state ─────────────────────────────────────────────────────────
+  const [measuring, setMeasuring] = useState(false)
+  const measuringRef = useRef(false)
+  const measureRef   = useRef<{ pts: L.LatLng[]; markers: L.Marker[]; line: L.Polyline | null }>
+    ({ pts: [], markers: [], line: null })
+
+  useEffect(() => {
+    measuringRef.current = measuring
+    const map = mapRef.current; if (!map) return
+    const mapNN = map   // non-null alias for use inside closures
+    const m = measureRef.current
+    function clearMeasure() {
+      m.markers.forEach(mk => mapNN.removeLayer(mk)); m.markers = []
+      if (m.line) { mapNN.removeLayer(m.line); m.line = null }
+      m.pts = []
+    }
+    function handleClick(e: L.LeafletMouseEvent) {
+      if (m.pts.length >= 2) clearMeasure()
+      m.pts.push(e.latlng)
+      const label = m.pts.length === 1 ? 'A' : 'B'
+      const icon = L.divIcon({
+        html: `<div style="width:10px;height:10px;background:#00d4ff;border-radius:50%;border:2px solid #fff;transform:translate(-5px,-5px);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#000">${label}</div>`,
+        className: '',
+      })
+      m.markers.push(L.marker(e.latlng, { icon, pane: 'markersPane' }).addTo(mapNN))
+      if (m.pts.length === 2) {
+        const dist = mapNN.distance(m.pts[0], m.pts[1])
+        const label = dist >= 1000 ? `${(dist / 1000).toFixed(3)} km` : `${dist.toFixed(1)} m`
+        m.line = L.polyline(m.pts, { color: '#00d4ff', weight: 2, dashArray: '5,3', opacity: 0.9, pane: 'centerPane' })
+          .bindTooltip(label, { permanent: true, className: 'tbm-tip', direction: 'center' })
+          .addTo(mapNN)
+      }
+    }
+    if (measuring) {
+      clearMeasure()
+      map.on('click', handleClick)
+      map.getContainer().style.cursor = 'crosshair'
+    } else {
+      map.off('click', handleClick)
+      map.getContainer().style.cursor = ''
+      clearMeasure()
+    }
+    return () => { map.off('click', handleClick); map.getContainer().style.cursor = '' }
+  }, [measuring])
 
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -568,6 +613,20 @@ export function LeafletMap({ data }: Props) {
             backdropFilter:'blur(4px)', fontFamily:'var(--mono)',
           }}>{label}</button>
         ))}
+        <div style={{ height: 3 }} />
+        <button
+          onClick={() => setMeasuring(m => !m)}
+          title="Measure distance"
+          style={{
+            width:30, height:30,
+            background: measuring ? 'var(--accent)' : 'var(--bg3)',
+            border:'1px solid var(--border2)', borderRadius:4,
+            color: measuring ? '#fff' : 'var(--text)',
+            fontSize:13, cursor:'pointer', display:'flex',
+            alignItems:'center', justifyContent:'center',
+            backdropFilter:'blur(4px)', fontFamily:'var(--mono)',
+          }}
+        >↔</button>
       </div>
       {/* Basemap buttons */}
       <BasemapButtons />

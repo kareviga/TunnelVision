@@ -36,9 +36,16 @@ export function ProfileView({ data }: Props) {
   const isDragging = useRef(false)
   const dragStart  = useRef({ x: 0, chMin: 0, chMax: 0 })
 
-  const [vExag, setVExag]       = useState(1)
+  const [vExag, setVExag]         = useState(1)
   const [panelOpen, setPanelOpen] = useState(false)
-  const [tooltip, setTooltip]   = useState<HitResult | null>(null)
+  const [tooltip, setTooltip]     = useState<HitResult | null>(null)
+  const [measuring, setMeasuring] = useState(false)
+  const measuringRef  = useRef(false)
+  const vExagRef      = useRef(1)
+  const measurePtsRef = useRef<[{ch:number;elev:number}|null, {ch:number;elev:number}|null]>([null, null])
+
+  useEffect(() => { vExagRef.current = vExag },    [vExag])
+  useEffect(() => { measuringRef.current = measuring }, [measuring])
 
   const paramDef = PARAMS[profChannel.param] ?? PARAMS.fpi
 
@@ -229,12 +236,32 @@ export function ProfileView({ data }: Props) {
           ctx.fill(); ctx.stroke()
           curCh -= len
         }
-        // cutterhead face ring only (no filled circle)
-        const r = Math.abs(cy(tunEl - TUNNEL_R) - cy(tunEl + TUNNEL_R)) / 2
-        ctx.beginPath(); ctx.arc(cx(last.ch), cy(tunEl), r, 0, Math.PI * 2)
-        ctx.strokeStyle = '#444'; ctx.lineWidth = 1.5
-        ctx.stroke()
       }
+    }
+
+    // ── Measure overlay ──────────────────────────────────────────────────
+    const [mA, mB] = measurePtsRef.current
+    if (mA) {
+      ctx.beginPath(); ctx.arc(cx(mA.ch), cy(mA.elev), 5, 0, Math.PI * 2)
+      ctx.fillStyle = '#00d4ff'; ctx.fill()
+      ctx.font = 'bold 9px "Share Tech Mono"'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'
+      ctx.fillText('A', cx(mA.ch), cy(mA.elev) - 9)
+    }
+    if (mA && mB) {
+      ctx.beginPath(); ctx.moveTo(cx(mA.ch), cy(mA.elev)); ctx.lineTo(cx(mB.ch), cy(mB.elev))
+      ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3])
+      ctx.stroke(); ctx.setLineDash([])
+      ctx.beginPath(); ctx.arc(cx(mB.ch), cy(mB.elev), 5, 0, Math.PI * 2)
+      ctx.fillStyle = '#00d4ff'; ctx.fill()
+      ctx.font = 'bold 9px "Share Tech Mono"'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'
+      ctx.fillText('B', cx(mB.ch), cy(mB.elev) - 9)
+      const dch = mB.ch - mA.ch, del = mB.elev - mA.elev
+      const dist = Math.sqrt(dch * dch + del * del)
+      const midX = (cx(mA.ch) + cx(mB.ch)) / 2, midY = (cy(mA.elev) + cy(mB.elev)) / 2
+      ctx.font = 'bold 11px "Share Tech Mono"'; ctx.fillStyle = '#00d4ff'; ctx.textAlign = 'center'
+      ctx.fillText(`${dist.toFixed(1)} m`, midX, midY - 9)
+      ctx.font = '9px "Share Tech Mono"'; ctx.fillStyle = '#7090a8'
+      ctx.fillText(`ΔCH ${Math.abs(dch).toFixed(0)} m  ΔZ ${del.toFixed(1)} m`, midX, midY + 14)
     }
   }, [data, currentTs, profChannel, profLayers, vExag, theme, paramDef])
 
@@ -331,9 +358,36 @@ export function ProfileView({ data }: Props) {
 
   function onMouseUp() { isDragging.current = false }
 
+  function canvasToWorld(relX: number, relY: number) {
+    if (!canvasRef.current) return null
+    const rect = canvasRef.current.getBoundingClientRect()
+    const PL = 64, PR = 24, PT = 32, PB = 44
+    const PW = rect.width - PL - PR, PH = rect.height - PT - PB
+    if (PW <= 0) return null
+    const { chMin, chMax, eMin, eMax } = viewRef.current
+    const ve = vExagRef.current
+    const scaleH = PW / (chMax - chMin)
+    const scaleV = scaleH * ve
+    const usedH  = (eMax - eMin) * scaleV
+    const offY   = (PH - usedH) / 2
+    return {
+      ch:   chMin + (relX - PL) / scaleH,
+      elev: eMax  - (relY - PT - offY) / scaleV,
+    }
+  }
+
   function onCanvasClick(e: React.MouseEvent) {
     if (!canvasRef.current) return
     const rect = canvasRef.current.getBoundingClientRect()
+    if (measuringRef.current) {
+      const pt = canvasToWorld(e.clientX - rect.left, e.clientY - rect.top)
+      if (pt) {
+        const [a, b] = measurePtsRef.current
+        measurePtsRef.current = (!a || b) ? [pt, null] : [a, pt]
+        draw()
+      }
+      return
+    }
     const hit = hitTestMano(e.clientX - rect.left, e.clientY - rect.top)
     if (hit) setSelectedSensor({ type: 'manometer', id: hit.id })
   }
@@ -430,7 +484,7 @@ export function ProfileView({ data }: Props) {
         >
           <canvas
             ref={canvasRef}
-            style={{ display:'block', cursor: tooltip ? 'pointer' : 'crosshair', width:'100%', height:'100%' }}
+            style={{ display:'block', cursor: measuring ? 'crosshair' : tooltip ? 'pointer' : 'default', width:'100%', height:'100%' }}
           />
 
           {tooltip && (
@@ -466,6 +520,24 @@ export function ProfileView({ data }: Props) {
                 fontFamily:'var(--mono)',
               }}>{label}</button>
             ))}
+            <div style={{ height: 3 }} />
+            <button
+              onClick={() => {
+                const next = !measuring
+                setMeasuring(next)
+                measuringRef.current = next
+                if (!next) { measurePtsRef.current = [null, null]; draw() }
+              }}
+              title="Measure distance"
+              style={{
+                width:30, height:30,
+                background: measuring ? 'var(--accent)' : 'var(--bg3)',
+                border:'1px solid var(--border2)', borderRadius:4,
+                color: measuring ? '#fff' : 'var(--text)',
+                fontSize:13, cursor:'pointer', display:'flex',
+                alignItems:'center', justifyContent:'center', fontFamily:'var(--mono)',
+              }}
+            >↔</button>
           </div>
 
           {/* Vertical exaggeration slider */}
