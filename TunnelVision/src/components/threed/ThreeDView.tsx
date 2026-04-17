@@ -64,15 +64,26 @@ interface SceneState {
 interface Props { data: AppData | null }
 
 export function ThreeDView({ data }: Props) {
-  const currentTs       = useStore(s => s.currentTs)
-  const zoomToTBMTick   = useStore(s => s.zoomToTBMTick)
-  const theme           = useStore(s => s.theme)
+  const currentTs        = useStore(s => s.currentTs)
+  const zoomToTBMTick    = useStore(s => s.zoomToTBMTick)
+  const theme            = useStore(s => s.theme)
   const threedLayers     = useStore(s => s.threedLayers)
   const exportPNGTick    = useStore(s => s.exportPNGTick)
   const activeView       = useStore(s => s.activeView)
+  const setSelectedSensor = useStore(s => s.setSelectedSensor)
   const mountRef         = useRef<HTMLDivElement>(null)
   const stateRef         = useRef<SceneState | null>(null)
+  const currentTsRef     = useRef(currentTs)
+  const dataRef          = useRef(data)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [piezoTooltip, setPiezoTooltip] = useState<{
+    x: number; y: number; id: string; sensorName: string
+    method: string; depth: number; soilClass: string
+    pressure: number | null; hasSeries: boolean
+  } | null>(null)
+
+  useEffect(() => { currentTsRef.current = currentTs }, [currentTs])
+  useEffect(() => { dataRef.current = data }, [data])
 
   // ── Initialise scene (once, when data is ready) ───────────────────────────
   useEffect(() => {
@@ -348,6 +359,60 @@ export function ThreeDView({ data }: Props) {
     a.click()
   }, [exportPNGTick])
 
+  // ── Piezometer raycasting (tooltip + click-to-chart) ─────────────────────
+  useEffect(() => {
+    const s = stateRef.current; if (!s || !data) return
+    const scene = s                        // non-null alias for nested fns
+    const canvas = scene.renderer.domElement
+    const raycaster = new THREE.Raycaster()
+
+    function getHit(e: MouseEvent) {
+      if (!scene.piezosGroup.visible) return null
+      const rect = canvas.getBoundingClientRect()
+      const ndc = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width)  *  2 - 1,
+        ((e.clientY - rect.top)  / rect.height) * -2 + 1,
+      )
+      raycaster.setFromCamera(ndc, scene.camera)
+      const hits = raycaster.intersectObjects(scene.piezosGroup.children, true)
+        .filter(h => h.object.userData?.type === 'piezo')
+      return hits.length ? hits[0] : null
+    }
+
+    function onMouseMove(e: MouseEvent) {
+      const hit = getHit(e)
+      if (!hit) { setPiezoTooltip(null); return }
+      const id = hit.object.userData.id as string
+      const p  = dataRef.current?.piezometers.find(p => p.id === id)
+      if (!p) { setPiezoTooltip(null); return }
+      const recent = p.series.filter(s => s[0] <= currentTsRef.current).at(-1)
+      setPiezoTooltip({
+        x: e.clientX, y: e.clientY,
+        id: p.id, sensorName: p.sensorName,
+        method: p.method, depth: p.depth, soilClass: p.soilClass,
+        pressure: recent ? recent[1] : null,
+        hasSeries: p.series.length > 0,
+      })
+    }
+
+    function onClick(e: MouseEvent) {
+      const hit = getHit(e)
+      if (!hit) return
+      const id = hit.object.userData.id as string
+      const p  = dataRef.current?.piezometers.find(p => p.id === id)
+      if (p?.series.length) setSelectedSensor({ type: 'piezometer', id })
+    }
+
+    canvas.addEventListener('mousemove', onMouseMove)
+    canvas.addEventListener('mouseleave', () => setPiezoTooltip(null))
+    canvas.addEventListener('click', onClick)
+    return () => {
+      canvas.removeEventListener('mousemove', onMouseMove)
+      canvas.removeEventListener('mouseleave', () => setPiezoTooltip(null))
+      canvas.removeEventListener('click', onClick)
+    }
+  }, [data, setSelectedSensor])
+
   return (
     <div className={styles.wrap}>
       {/* Left panel */}
@@ -359,6 +424,30 @@ export function ThreeDView({ data }: Props) {
       <div style={{ flex: 1, height: '100%', position: 'relative' }}>
         <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
         {!data && <div className={styles.loading}>LOADING 3D DATA…</div>}
+        {/* Piezometer tooltip */}
+        {piezoTooltip && (
+          <div style={{
+            position: 'fixed', left: piezoTooltip.x + 14, top: piezoTooltip.y - 10,
+            background: '#111', border: '1px solid #253040',
+            borderRadius: 4, padding: '5px 9px',
+            fontFamily: 'var(--mono)', fontSize: 10, color: '#fff',
+            pointerEvents: 'none', zIndex: 9999, lineHeight: 1.8,
+            boxShadow: '0 2px 8px rgba(0,0,0,.5)',
+          }}>
+            <div style={{ fontFamily: 'var(--cond)', fontSize: 13, fontWeight: 700, color: '#f472b6' }}>
+              PZ {piezoTooltip.id}{piezoTooltip.sensorName ? ` (${piezoTooltip.sensorName})` : ''}
+            </div>
+            {piezoTooltip.pressure !== null && (
+              <div>{piezoTooltip.pressure.toFixed(1)} <span style={{ color: '#7090a8' }}>kPa</span></div>
+            )}
+            {piezoTooltip.method && <div style={{ color: '#7090a8' }}>{piezoTooltip.method}</div>}
+            {piezoTooltip.soilClass && <div style={{ color: '#7090a8' }}>{piezoTooltip.soilClass}</div>}
+            <div style={{ color: '#7090a8' }}>Depth: {piezoTooltip.depth} m</div>
+            {piezoTooltip.hasSeries && (
+              <div style={{ color: '#7090a8', fontSize: 9, marginTop: 2 }}>Click to open chart</div>
+            )}
+          </div>
+        )}
         <div className={styles.hint}>DRAG TO ROTATE · SCROLL TO ZOOM · DOUBLE-CLICK RESET</div>
         {/* Zoom controls */}
         <div style={{ position:'absolute', top:12, right:12, display:'flex', flexDirection:'column', gap:3, zIndex:10 }}>
@@ -423,6 +512,7 @@ function buildPiezometers(
     const sMat = new THREE.MeshBasicMaterial({ color: PINK, transparent: true, opacity: 0.85 })
     const sphere = new THREE.Mesh(sGeo, sMat)
     sphere.position.set(x, yTop, z)
+    sphere.userData = { type: 'piezo', id: p.id }
     group.add(sphere)
   }
 }
