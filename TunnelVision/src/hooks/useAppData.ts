@@ -80,11 +80,12 @@ async function loadPiezoData(url: string): Promise<Map<string, Array<[number, nu
 // Normalise a position ID to candidate sensor names in the data file
 function normalisePiezoId(id: string): string[] {
   const s = id.trim()
-  const candidates = [s]
+  const s2 = s.replace(/-/g, '')
+  const candidates = [s, s2]
   // "2101PZ" → "PZ2101"
   if (/\d+PZ$/i.test(s)) candidates.push('PZ' + s.replace(/PZ$/i, ''))
   // "362-1" → "PZ362-1", "PZP362-1"
-  candidates.push('PZ' + s, 'PZP' + s)
+  candidates.push('PZ' + s, 'PZP' + s, 'PZ' + s2, 'PZP' + s2)
   return candidates
 }
 
