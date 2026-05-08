@@ -89,6 +89,13 @@ export function LeafletMap({ data }: Props) {
   const isActive          = activeView === 'map'
   const setStore          = useStore
 
+  // Keep a ref so draw callbacks can read currentTs without being recreated on every tick
+  const currentTsRef = useRef(currentTs)
+  useEffect(() => { currentTsRef.current = currentTs }, [currentTs])
+
+  // Persistent TBM head layers — created once, position updated in place
+  const tbmPartsRef = useRef<{ polys: L.Polygon[]; marker: L.Marker } | null>(null)
+
   // ── Measure state ─────────────────────────────────────────────────────────
   const [measuring, setMeasuring] = useState(false)
   const measuringRef = useRef(false)
@@ -169,6 +176,34 @@ export function LeafletMap({ data }: Props) {
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
+
+  // Create TBM head Leaflet objects once; reuse them every tick via setLatLngs / setLatLng
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !data) return
+
+    // Clean up any previous parts (e.g. data reload)
+    if (tbmPartsRef.current) {
+      tbmPartsRef.current.polys.forEach(p => map.removeLayer(p))
+      map.removeLayer(tbmPartsRef.current.marker)
+      tbmPartsRef.current = null
+    }
+
+    const polys = TBM_PARTS.map(([name, , fill, stroke]) =>
+      L.polygon([] as L.LatLngTuple[], {
+        pane: 'tbmPane', color: stroke, weight: 1, fillColor: fill, fillOpacity: 1,
+      }).bindTooltip(name, { sticky: true, className: 'tbm-tip' }).addTo(map)
+    )
+    const icon = L.divIcon({
+      html: `<div style="position:relative;width:0;height:0">
+        <div style="position:absolute;top:-14px;left:-14px;width:28px;height:28px;border:2px solid #22c55e;border-radius:50%;animation:tbmp 1.5s infinite"></div>
+        <div style="position:absolute;top:-5px;left:-5px;width:10px;height:10px;background:#22c55e;border-radius:50%"></div>
+      </div>`,
+      className: '', iconAnchor: [0, 0],
+    })
+    const marker = L.marker([0, 0], { icon, pane: 'markersPane', zIndexOffset: 2000 }).addTo(map)
+    tbmPartsRef.current = { polys, marker }
+  }, [data])
 
   // ── Layer order → pane z-index ────────────────────────────────────────────
   const LAYER_PANE: Record<string, string> = {
@@ -482,39 +517,27 @@ export function LeafletMap({ data }: Props) {
     layersRef.current.piezos = pl
   }, [data, currentTs, layerVis.piezos, setSelectedSensor, piezAnnotations])
 
-  // ── Draw TBM head ─────────────────────────────────────────────────────────
+  // ── Update TBM head position (no layer recreation — just moves existing objects) ──
   const drawTBMHead = useCallback(() => {
-    const map = mapRef.current; if (!map || !data) return
-    removeLayer('tbmHead')
-    const vis = data.tbm.filter(t => t.ts <= currentTs)
+    const parts = tbmPartsRef.current
+    if (!parts || !data) return
+    const vis = data.tbm.filter(t => t.ts <= currentTsRef.current)
     if (!vis.length) return
-    const t = vis[vis.length-1]
-    const { lat, lon, dir } = t
-    const hl = L.layerGroup()
-    let curLat = lat, curLon = lon
+    const { lat, lon, dir } = vis[vis.length - 1]
     const backDir = (dir + 180) % 360
-    for (const [name, len, fill, stroke] of TBM_PARTS) {
+    let curLat = lat, curLon = lon
+    for (let i = 0; i < TBM_PARTS.length; i++) {
+      const [, len] = TBM_PARTS[i]
       const perpR = (dir + 90) % 360, perpL = (dir - 90 + 360) % 360
       const [bLat, bLon] = off(curLat, curLon, backDir, len)
-      const coords: [number,number][] = [
+      parts.polys[i].setLatLngs([
         off(curLat, curLon, perpL, TBM_W), off(curLat, curLon, perpR, TBM_W),
         off(bLat, bLon, perpR, TBM_W),     off(bLat, bLon, perpL, TBM_W),
-      ]
-      L.polygon(coords, { pane:'tbmPane', color:stroke, weight:1, fillColor:fill, fillOpacity:1 })
-        .bindTooltip(name, { sticky: true, className:'tbm-tip' }).addTo(hl)
+      ])
       ;[curLat, curLon] = off(curLat, curLon, backDir, len)
     }
-    const icon = L.divIcon({
-      html: `<div style="position:relative;width:0;height:0">
-        <div style="position:absolute;top:-14px;left:-14px;width:28px;height:28px;border:2px solid #22c55e;border-radius:50%;animation:tbmp 1.5s infinite"></div>
-        <div style="position:absolute;top:-5px;left:-5px;width:10px;height:10px;background:#22c55e;border-radius:50%"></div>
-      </div>`,
-      className: '', iconAnchor: [0, 0],
-    })
-    L.marker([lat, lon], { icon, pane:'markersPane', zIndexOffset:2000 }).addTo(hl)
-    hl.addTo(map)
-    layersRef.current.tbmHead = hl
-  }, [data, currentTs])
+    parts.marker.setLatLng([lat, lon])
+  }, [data])  // ← no currentTs dep; reads currentTsRef instead
 
   // ── Draw CH markers ───────────────────────────────────────────────────────
   function redrawMarkers(map: L.Map) {
@@ -558,11 +581,12 @@ export function LeafletMap({ data }: Props) {
   // ── Reactive redraws ──────────────────────────────────────────────────────
   const pendingRedrawRef = useRef(false)
 
-  // Fast path: TBM head always updates (even while sliding)
+  // Fast path: TBM head updates on every tick — drawTBMHead is stable so this only
+  // re-runs when currentTs actually changes, not when other callbacks are recreated
   useEffect(() => {
     if (!isActive) return
     drawTBMHead()
-  }, [isActive, drawTBMHead])
+  }, [isActive, currentTs, drawTBMHead])
 
   // Slow path: expensive layers — skip while slider is being dragged
   useEffect(() => {
