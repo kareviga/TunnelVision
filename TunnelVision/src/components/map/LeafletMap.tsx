@@ -96,6 +96,9 @@ export function LeafletMap({ data }: Props) {
   // Persistent TBM head layers — created once, position updated in place
   const tbmPartsRef = useRef<{ polys: L.Polygon[]; marker: L.Marker } | null>(null)
 
+  // Track selected grout polygon for border-highlight selection UX
+  const selectedGroutRef = useRef<{ layer: L.Polygon; origStyle: L.PathOptions } | null>(null)
+
   // ── Measure state ─────────────────────────────────────────────────────────
   const [measuring, setMeasuring] = useState(false)
   const measuringRef = useRef(false)
@@ -399,6 +402,7 @@ export function LeafletMap({ data }: Props) {
   const drawGrout = useCallback(() => {
     const map = mapRef.current; if (!map || !data) return
     removeLayer('grout')
+    selectedGroutRef.current = null  // reset selection on full redraw
     if (!layerVis.grout) return
     const vis = data.grout.filter(g => g.ts <= currentTs)
     const gl = L.layerGroup()
@@ -421,21 +425,38 @@ export function LeafletMap({ data }: Props) {
         off(fcLat, fcLon, perpR, eHW), off(fcLat, fcLon, perpL, eHW),
       ]
       const tip =
-        `<b style="color:var(--accent)">Screen CH ${formatCH(g.ch)}</b><br/>` +
+        `<b style="color:#00d4ff">Screen CH ${formatCH(g.ch)}</b><br/>` +
         `${g.drillType} | Screen: ${g.screenLen}m<br/>` +
         `Inleakage: ${g.inleakage} L/min | Vol: ${g.injVol.toLocaleString()} L<br/>` +
         `Cement: ${g.cement} kg | Drillm: ${g.drillM} m`
       const val = isDrillingOnly ? 0
         : (paramDef ? (g as unknown as Record<string, number>)[paramDef.field] ?? 0 : 0)
       const fillColor = groutStyle.color || groutAttrColor(val)
-      L.polygon(corners, {
-        pane: 'groutPane',
+
+      const origStyle: L.PathOptions = {
         color:       isDrillingOnly ? '#ef4444' : '#555',
         weight:      isDrillingOnly ? 1.8 : 0.5,
         dashArray:   isDrillingOnly ? '6,4' : undefined,
         fillColor,
         fillOpacity: groutStyle.opacity,
-      }).bindTooltip(tip, { sticky: true, className: 'tbm-tip' }).addTo(gl)
+      }
+      const poly = L.polygon(corners, { pane: 'groutPane', ...origStyle })
+        .bindTooltip(tip, { sticky: true, className: 'tbm-tip' })
+        .on('click', () => {
+          // Deselect previous
+          if (selectedGroutRef.current) {
+            selectedGroutRef.current.layer.setStyle(selectedGroutRef.current.origStyle)
+          }
+          // Toggle off if clicking the same polygon again
+          if (selectedGroutRef.current?.layer === poly) {
+            selectedGroutRef.current = null
+            return
+          }
+          // Select this polygon — change border to accent colour
+          selectedGroutRef.current = { layer: poly, origStyle }
+          poly.setStyle({ color: '#00d4ff', weight: 2, dashArray: undefined })
+        })
+      poly.addTo(gl)
     }
     gl.addTo(map)
     layersRef.current.grout = gl
