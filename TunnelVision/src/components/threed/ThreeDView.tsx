@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useStore } from '../../store/useStore'
+import { downloadDataUrl, printAsPDF } from '../../utils/exportImage'
+import { ExportButton } from '../shared/ExportButton'
 import { ThreeDPanel } from './ThreeDPanel'
 import type { AppData } from '../../types'
 import styles from './ThreeDView.module.css'
@@ -69,7 +71,6 @@ export function ThreeDView({ data }: Props) {
   const zoomToTBMTick    = useStore(s => s.zoomToTBMTick)
   const theme            = useStore(s => s.theme)
   const threedLayers     = useStore(s => s.threedLayers)
-  const exportPNGTick    = useStore(s => s.exportPNGTick)
   const activeView       = useStore(s => s.activeView)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
   const mountRef         = useRef<HTMLDivElement>(null)
@@ -368,16 +369,17 @@ export function ThreeDView({ data }: Props) {
     s.controls.update()
   }, [zoomToTBMTick])
 
-  // ── Export 3D view as PNG ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (exportPNGTick === 0 || activeView !== '3d') return
+  function handleExportPNG() {
     const s = stateRef.current; if (!s) return
     s.renderer.render(s.scene, s.camera)
-    const a = document.createElement('a')
-    a.href = s.renderer.domElement.toDataURL('image/png')
-    a.download = `3DView_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.png`
-    a.click()
-  }, [exportPNGTick])
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    downloadDataUrl(s.renderer.domElement.toDataURL('image/png'), `3DView_${date}.png`)
+  }
+  function handleExportPDF() {
+    const s = stateRef.current; if (!s) return
+    s.renderer.render(s.scene, s.camera)
+    printAsPDF(s.renderer.domElement.toDataURL('image/png'), '3D View')
+  }
 
   // ── Piezometer raycasting (tooltip + click-to-chart) ─────────────────────
   useEffect(() => {
@@ -619,6 +621,8 @@ export function ThreeDView({ data }: Props) {
               backdropFilter:'blur(4px)', fontFamily:'var(--mono)',
             }}
           >↔</button>
+          <div style={{ height: 3 }} />
+          <ExportButton onPNG={handleExportPNG} onPDF={handleExportPDF} />
         </div>
       </div>
 

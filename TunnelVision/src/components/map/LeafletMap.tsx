@@ -5,6 +5,9 @@ import { off, TUNNEL_R, TBM_W } from '../../utils/geo'
 import { valToColor } from '../../utils/color'
 import { formatCH, fmtDate } from '../../utils/format'
 import { PARAMS, RING_TYPE_COLORS, GROUT_PARAMS } from '../../data/params'
+import { captureLeafletMap } from '../../utils/captureMap'
+import { downloadDataUrl, printAsPDF } from '../../utils/exportImage'
+import { ExportButton } from '../shared/ExportButton'
 import type { AppData, TBMRecord } from '../../types'
 
 const TILE_URLS = {
@@ -64,6 +67,7 @@ function chInterval(z: number) {
 export function LeafletMap({ data }: Props) {
   const mapRef        = useRef<L.Map | null>(null)
   const containerRef  = useRef<HTMLDivElement>(null)
+  const outerRef      = useRef<HTMLDivElement>(null)
   const tilesRef      = useRef<Record<string,L.TileLayer>>({})
   const layersRef     = useRef<{
     tunnel: L.LayerGroup|null, center: L.Polyline|null, markers: L.LayerGroup|null,
@@ -592,6 +596,17 @@ export function LeafletMap({ data }: Props) {
     layersRef.current.markers = ml
   }
 
+  // ── Export ────────────────────────────────────────────────────────────────
+  async function handleExportPNG() {
+    if (!outerRef.current) return
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    downloadDataUrl(await captureLeafletMap(outerRef.current), `MapView_${date}.png`)
+  }
+  async function handleExportPDF() {
+    if (!outerRef.current) return
+    printAsPDF(await captureLeafletMap(outerRef.current), 'Map View')
+  }
+
   // ── Fit tunnel ────────────────────────────────────────────────────────────
   function fitTunnel() {
     const map = mapRef.current; if (!map || !data) return
@@ -642,9 +657,9 @@ export function LeafletMap({ data }: Props) {
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
   return (
-    <div style={{ flex:1, position:'relative', display:'flex', flexDirection:'column' }}>
+    <div ref={outerRef} style={{ flex:1, position:'relative', display:'flex', flexDirection:'column' }}>
       <div ref={containerRef} style={{ flex:1 }} />
-      {/* Custom zoom controls */}
+      {/* Custom zoom + export controls */}
       <div style={{ position:'absolute', top:12, right:12, display:'flex', flexDirection:'column', gap:3, zIndex:1000 }}>
         {([
           ['+', () => mapRef.current?.zoomIn()],
@@ -672,6 +687,8 @@ export function LeafletMap({ data }: Props) {
             backdropFilter:'blur(4px)', fontFamily:'var(--mono)',
           }}
         >↔</button>
+        <div style={{ height: 3 }} />
+        <ExportButton onPNG={handleExportPNG} onPDF={handleExportPDF} />
       </div>
       {/* Basemap buttons */}
       <BasemapButtons />

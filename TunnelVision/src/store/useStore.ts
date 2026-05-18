@@ -106,12 +106,9 @@ interface AppStore {
   threedLayers: Record<ThreeDLayerKey, boolean>
   toggleThreedLayer: (k: ThreeDLayerKey) => void
 
-  // PNG export trigger (increment to fire in active view)
-  exportPNGTick: number
-  triggerExportPNG: () => void
 }
 
-export const useStore = create<AppStore>((set, get) => ({
+export const useStore = create<AppStore>((set, _get) => ({
   activeView: 'map',
   setView: v => set({ activeView: v }),
 
@@ -224,6 +221,4 @@ export const useStore = create<AppStore>((set, get) => ({
   toggleThreedLayer: k =>
     set(s => ({ threedLayers: { ...s.threedLayers, [k]: !s.threedLayers[k] } })),
 
-  exportPNGTick: 0,
-  triggerExportPNG: () => set(s => ({ exportPNGTick: s.exportPNGTick + 1 })),
 }))

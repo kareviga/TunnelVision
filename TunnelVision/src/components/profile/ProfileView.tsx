@@ -4,6 +4,8 @@ import { formatCH } from '../../utils/format'
 import { valToColor, groutAttrColor } from '../../utils/color'
 import { PARAMS } from '../../data/params'
 import { TUNNEL_R } from '../../utils/geo'
+import { downloadDataUrl, printAsPDF } from '../../utils/exportImage'
+import { ExportButton } from '../shared/ExportButton'
 import type { AppData } from '../../types'
 import { ProfilePanel } from './ProfilePanel'
 import styles from './ProfileView.module.css'
@@ -27,7 +29,6 @@ export function ProfileView({ data }: Props) {
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const theme             = useStore(s => s.theme)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
-  const exportPNGTick     = useStore(s => s.exportPNGTick)
   const activeView        = useStore(s => s.activeView)
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
@@ -315,16 +316,16 @@ export function ProfileView({ data }: Props) {
     draw()
   }, [zoomToTBMTick])
 
-  useEffect(() => {
-    if (exportPNGTick === 0 || activeView !== 'profile') return
+  function handleExportPNG() {
     const canvas = canvasRef.current; if (!canvas) return
     const v = viewRef.current
     const fmt = (ch: number) => String(Math.round(ch))
-    const a = document.createElement('a')
-    a.href = canvas.toDataURL('image/png')
-    a.download = `Profile_CH${fmt(v.chMin)}-${fmt(v.chMax)}.png`
-    a.click()
-  }, [exportPNGTick])
+    downloadDataUrl(canvas.toDataURL('image/png'), `Profile_CH${fmt(v.chMin)}-${fmt(v.chMax)}.png`)
+  }
+  function handleExportPDF() {
+    const canvas = canvasRef.current; if (!canvas) return
+    printAsPDF(canvas.toDataURL('image/png'), 'Profile View')
+  }
 
   function onWheel(e: React.WheelEvent) {
     e.preventDefault()
@@ -538,6 +539,8 @@ export function ProfileView({ data }: Props) {
                 alignItems:'center', justifyContent:'center', fontFamily:'var(--mono)',
               }}
             >↔</button>
+            <div style={{ height: 3 }} />
+            <ExportButton onPNG={handleExportPNG} onPDF={handleExportPDF} />
           </div>
 
           {/* Vertical exaggeration slider */}
