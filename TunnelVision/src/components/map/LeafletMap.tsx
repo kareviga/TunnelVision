@@ -387,10 +387,10 @@ export function LeafletMap({ data }: Props) {
       onEachFeature: (feature, layer) => {
         const p = feature.properties
         const tipHtml = `
-          <b style="color:var(--accent);font-family:var(--cond);font-size:13px">${p.label}</b><br/>
-          <span style="color:var(--text2)">Value: </span><span style="color:var(--text)">${p.val?.toFixed(2)} ${p.unit}</span><br/>
-          <span style="color:var(--text2)">Ring: </span><span style="color:var(--text)">${p.ring}</span>
-          <span style="color:var(--text2)">&nbsp;CH: </span><span style="color:var(--text)">${formatCH(p.ch)}</span>`
+          <b style="color:#00d4ff;font-family:var(--cond);font-size:13px">${p.label}</b><br/>
+          <span style="color:#8899aa">Value: </span><span style="color:#e2e8f0">${p.val?.toFixed(2)} ${p.unit}</span><br/>
+          <span style="color:#8899aa">Ring: </span><span style="color:#e2e8f0">${p.ring}</span>
+          <span style="color:#8899aa">&nbsp;CH: </span><span style="color:#e2e8f0">${formatCH(p.ch)}</span>`
         layer.bindTooltip(tipHtml, { sticky: true, opacity: 0.96, className: 'tbm-tip' })
         layer.on('mouseover', function(this: L.Path) { this.setStyle({ weight: 1.5, fillOpacity: 1 }) })
         layer.on('mouseout',  function(this: L.Layer) { layersRef.current.bars?.resetStyle(this) })
