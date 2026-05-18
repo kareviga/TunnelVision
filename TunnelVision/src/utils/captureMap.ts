@@ -1,5 +1,5 @@
-// Fast Leaflet map capture: composites tile <img> elements + serialised SVG
-// panes directly onto a canvas — avoids html2canvas DOM traversal.
+// Fast Leaflet map capture: composites tile <img> elements + SVG panes
+// onto a canvas. SVGs are loaded in parallel then drawn in DOM order.
 export async function captureLeafletMap(container: HTMLElement): Promise<string> {
   const rect = container.getBoundingClientRect()
   const W = Math.round(rect.width)
@@ -12,7 +12,7 @@ export async function captureLeafletMap(container: HTMLElement): Promise<string>
   ctx.fillStyle = '#0a0c10'
   ctx.fillRect(0, 0, W, H)
 
-  // 1. Tile images drawn in parallel from existing DOM elements
+  // 1. Tiles — draw in parallel from existing DOM elements
   const tiles = Array.from(
     container.querySelectorAll<HTMLImageElement>('img.leaflet-tile'),
   ).filter(t => t.complete && t.naturalWidth > 0)
@@ -36,27 +36,38 @@ export async function captureLeafletMap(container: HTMLElement): Promise<string>
     }
   }))
 
-  // 2. SVG panes stamped in DOM order (= correct z-order)
+  // 2. SVG panes — load all in parallel, then draw in DOM order (correct z-order)
   const svgs = Array.from(container.querySelectorAll<SVGSVGElement>('svg'))
-  for (const svg of svgs) {
+
+  type SvgResult = { img: HTMLImageElement; x: number; y: number } | null
+
+  const loaded = await Promise.all(svgs.map((svg): Promise<SvgResult> => {
     const sr = svg.getBoundingClientRect()
-    if (!sr.width || !sr.height) continue
+    if (!sr.width || !sr.height) return Promise.resolve(null)
+
     const clone = svg.cloneNode(true) as SVGSVGElement
     clone.style.transform = 'none'
+
     const url = URL.createObjectURL(
       new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }),
     )
-    await new Promise<void>(resolve => {
+
+    return new Promise<SvgResult>(resolve => {
       const img = new Image()
       img.onload = () => {
-        try { ctx.drawImage(img, sr.left - rect.left, sr.top - rect.top) } catch { /* skip */ }
         URL.revokeObjectURL(url)
-        resolve()
+        resolve({ img, x: sr.left - rect.left, y: sr.top - rect.top })
       }
-      img.onerror = () => { URL.revokeObjectURL(url); resolve() }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
       img.src = url
-      setTimeout(() => { URL.revokeObjectURL(url); resolve() }, 4000)
+      setTimeout(() => { URL.revokeObjectURL(url); resolve(null) }, 3000)
     })
+  }))
+
+  // Draw in DOM order so z-order is correct
+  for (const r of loaded) {
+    if (!r) continue
+    try { ctx.drawImage(r.img, r.x, r.y) } catch { /* skip */ }
   }
 
   return canvas.toDataURL('image/png')
