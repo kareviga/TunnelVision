@@ -156,9 +156,15 @@ export function ProfilePanel() {
       {/* Layers */}
       <Section title="Layers">
         <ul className={styles.layerList}>
-          {(['grout','mano','soil','rock'] as const).map(k => {
-            const labels: Record<string,string> = { grout:'Drilling & grouting', mano:'Manometers', soil:'Soil', rock:'Rock' }
-            const colors: Record<string,string> = { grout:'#818cf8', mano:'#60a5fa', soil:'rgba(160,120,70,.6)', rock:'rgba(90,110,140,.6)' }
+          {(['tunnel','tbmParam','grout','mano','soil','rock'] as const).map(k => {
+            const labels: Record<string,string> = {
+              tunnel: 'Tunnel body', tbmParam: 'TBM data parameter',
+              grout:'Drilling & grouting', mano:'Manometers', soil:'Soil', rock:'Rock',
+            }
+            const colors: Record<string,string> = {
+              tunnel: 'rgba(40,60,80,0.9)', tbmParam: 'var(--accent)',
+              grout:'#818cf8', mano:'#60a5fa', soil:'rgba(160,120,70,.6)', rock:'rgba(90,110,140,.6)',
+            }
             return (
               <li key={k} className={styles.layerItem} onClick={() => toggleProfLayer(k)}>
                 <div className={`${styles.toggle} ${profLayers[k] ? styles.on : ''}`} />

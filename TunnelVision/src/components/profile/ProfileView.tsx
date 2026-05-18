@@ -29,7 +29,6 @@ export function ProfileView({ data }: Props) {
   const zoomToTBMTick     = useStore(s => s.zoomToTBMTick)
   const theme             = useStore(s => s.theme)
   const setSelectedSensor = useStore(s => s.setSelectedSensor)
-  const activeView        = useStore(s => s.activeView)
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const wrapRef    = useRef<HTMLDivElement>(null)
@@ -154,6 +153,34 @@ export function ProfileView({ data }: Props) {
     pts.forEach((p,i) => i===0 ? ctx.moveTo(cx(p.ch), cy(p.surfaceElev)) : ctx.lineTo(cx(p.ch), cy(p.surfaceElev)))
     ctx.stroke()
 
+    if (profLayers.tunnel) {
+      const tbmAll = data.tbm.filter(t => t.ts <= currentTs)
+      const maxCh  = tbmAll.length ? tbmAll[tbmAll.length - 1].ch : -Infinity
+      const excPts = pts.filter(p => p.ch <= maxCh)
+      if (excPts.length > 1) {
+        ctx.fillStyle = 'rgba(40,60,80,0.50)'
+        ctx.beginPath()
+        excPts.forEach((p, i) => i === 0
+          ? ctx.moveTo(cx(p.ch), cy(p.tunnelElev + TUNNEL_R))
+          : ctx.lineTo(cx(p.ch), cy(p.tunnelElev + TUNNEL_R)))
+        for (let i = excPts.length - 1; i >= 0; i--)
+          ctx.lineTo(cx(excPts[i].ch), cy(excPts[i].tunnelElev - TUNNEL_R))
+        ctx.closePath(); ctx.fill()
+
+        ctx.strokeStyle = 'rgba(100,160,220,0.45)'; ctx.lineWidth = 0.8
+        ctx.beginPath()
+        excPts.forEach((p, i) => i === 0
+          ? ctx.moveTo(cx(p.ch), cy(p.tunnelElev + TUNNEL_R))
+          : ctx.lineTo(cx(p.ch), cy(p.tunnelElev + TUNNEL_R)))
+        ctx.stroke()
+        ctx.beginPath()
+        excPts.forEach((p, i) => i === 0
+          ? ctx.moveTo(cx(p.ch), cy(p.tunnelElev - TUNNEL_R))
+          : ctx.lineTo(cx(p.ch), cy(p.tunnelElev - TUNNEL_R)))
+        ctx.stroke()
+      }
+    }
+
     if (profLayers.grout) {
       const fanRad = 8 * Math.PI / 180
       const vg = data.grout.filter(g => g.ts <= currentTs && g.ch >= chMin-50 && g.ch <= chMax+50)
@@ -177,7 +204,7 @@ export function ProfileView({ data }: Props) {
       }
     }
 
-    if (profChannel.param !== 'none') {
+    if (profLayers.tbmParam && profChannel.param !== 'none') {
       const field = paramDef.field as string
       const visTBM = data.tbm.filter(t => t.ts <= currentTs && t.ch >= chMin-50 && t.ch <= chMax+50)
       if (visTBM.length > 1) {

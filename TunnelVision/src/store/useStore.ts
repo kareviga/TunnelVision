@@ -213,7 +213,7 @@ export const useStore = create<AppStore>((set, _get) => ({
       }
       return result
     }),
-  profLayers: { grout: true, mano: true, soil: true, rock: true },
+  profLayers: { tunnel: true, tbmParam: true, grout: true, mano: true, soil: true, rock: true },
   toggleProfLayer: k =>
     set(s => ({ profLayers: { ...s.profLayers, [k]: !s.profLayers[k] } })),
 

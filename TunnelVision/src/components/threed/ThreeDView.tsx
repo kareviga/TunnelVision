@@ -5,6 +5,7 @@ import { useStore } from '../../store/useStore'
 import { downloadDataUrl, printAsPDF } from '../../utils/exportImage'
 import { ExportButton } from '../shared/ExportButton'
 import { ThreeDPanel } from './ThreeDPanel'
+import { DEFAULT_CLASSES } from '../../data/params'
 import type { AppData } from '../../types'
 import styles from './ThreeDView.module.css'
 
@@ -59,6 +60,7 @@ interface SceneState {
   drillHolesMesh:      THREE.LineSegments | null
   drillHolesChainages: number[]
   drillHoleStartPts:   { pos: THREE.Vector3; holeNo: number; length: number; inleakage: number }[]
+  ringData:       { mesh: THREE.Mesh; ts: number }[]
   initCamPos:     THREE.Vector3
   initTarget:     THREE.Vector3
 }
@@ -196,16 +198,38 @@ export function ThreeDView({ data }: Props) {
     tunnelGroup.add(excTube, futTube)
     scene.add(tunnelGroup)
 
-    // ── Ring outlines ──────────────────────────────────────────────────────
+    // ── Ring outlines (FPI-coloured, time-gated) ───────────────────────────
     const ringGroup = new THREE.Group()
+    const ringData: { mesh: THREE.Mesh; ts: number }[] = []
+
     for (let i = 0; i < alignPts.length; i += 20) {
-      const pt  = alignPts[i]
-      const geo = new THREE.TorusGeometry(TUNNEL_R + 0.08, 0.06, 6, RADIAL_SEGS)
-      const mat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.18 })
+      const pt = alignPts[i]
+      // Find TBM record closest in chainage to this ring
+      let bestTbm = data.tbm[0]
+      let bestDist = Infinity
+      for (const t of data.tbm) {
+        const d = Math.abs(t.ch - pt.ch)
+        if (d < bestDist) { bestDist = d; bestTbm = t }
+      }
+      const fpi = bestTbm?.fpi ?? 0
+      const ts  = bestTbm?.ts  ?? 0
+
+      // Map FPI to color using default discrete classes
+      let hex = 0x404040
+      if (bestTbm) {
+        for (const c of DEFAULT_CLASSES.fpi) {
+          if (fpi >= c.from && fpi < c.to) { hex = parseInt(c.color.slice(1), 16); break }
+        }
+      }
+
+      const geo  = new THREE.TorusGeometry(TUNNEL_R + 0.08, 0.06, 6, RADIAL_SEGS)
+      const mat  = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.75 })
       const ring = new THREE.Mesh(geo, mat)
       ring.position.copy(pt.pos)
       ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pt.dir)
+      ring.visible = false
       ringGroup.add(ring)
+      ringData.push({ mesh: ring, ts })
     }
     scene.add(ringGroup)
 
@@ -287,7 +311,7 @@ export function ThreeDView({ data }: Props) {
       tubularSegs, alignPts,
       chMin, chMax, rafId,
       drillHolesMesh, drillHolesChainages, drillHoleStartPts,
-      initCamPos, initTarget,
+      ringData, initCamPos, initTarget,
     }
 
     return () => {
@@ -326,6 +350,10 @@ export function ThreeDView({ data }: Props) {
     if (s.drillHolesMesh) {
       const visibleCount = s.drillHolesChainages.filter(ch => ch <= last.ch).length
       s.drillHolesMesh.geometry.setDrawRange(0, visibleCount * 2)
+    }
+
+    for (const r of s.ringData) {
+      r.mesh.visible = r.ts <= currentTs
     }
   }, [currentTs, data])
 
