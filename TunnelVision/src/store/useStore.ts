@@ -15,7 +15,7 @@ export interface PiezAnnotation {
   recoveryTs: number; recoveryVal: number  // start of recovery
 }
 
-export type ViewId = 'map' | 'profile' | '3d' | 'reports'
+export type ViewId = 'map' | 'profile' | '3d' | 'reports' | 'summary'
 
 function makeChannel(param: string, scaleMin: number, scaleMax: number, discrete: boolean): ChannelState {
   return {
